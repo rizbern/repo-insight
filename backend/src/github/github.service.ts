@@ -21,13 +21,14 @@ export class GithubService {
 
   async listTestRepos(orgName: string, prefix = 'pt-') {
     try {
-      const response = await this.octokit.repos.listForUser({
-        username: orgName,
-        type: 'all',
+      // listForUser only returns public repos. To get private repos, we must use listForAuthenticatedUser
+      // and filter by the requested org/user name.
+      const response = await this.octokit.repos.listForAuthenticatedUser({
         per_page: 100,
+        affiliation: 'owner,organization_member',
       });
 
-      const repos = response.data;
+      const repos = response.data.filter((r) => r.owner.login === orgName);
       
       const testRepos = repos
         .filter((repo) => repo.name.startsWith(prefix))
