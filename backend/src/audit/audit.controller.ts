@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuditService } from './audit.service';
 import { AuditAction } from '@prisma/client';
 
@@ -19,6 +20,14 @@ export class AuditController {
       skip: skip ? parseInt(skip, 10) : undefined,
       take: take ? parseInt(take, 10) : undefined,
     });
+  }
+
+  @Get('export')
+  async exportCsv(@Res() res: Response) {
+    const csv = await this.auditService.exportCsv();
+    res.header('Content-Type', 'text/csv');
+    res.attachment('audit-export.csv');
+    return res.send(csv);
   }
 
   @Post('logs')

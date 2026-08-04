@@ -50,6 +50,27 @@ export default function AuditLog() {
       .finally(() => setLoading(false));
   };
 
+  const exportCsv = async () => {
+    try {
+      const res = await fetch(`http://localhost:3000/api/audit/export`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to export CSV');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'audit-export.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      setError("Could not export CSV. Please try again.");
+    }
+  };
+
   useEffect(() => {
     if (!token) return;
     fetchLogs();
@@ -107,6 +128,9 @@ export default function AuditLog() {
           <div style={{ flex: 1, fontSize: 14, fontWeight: 500, color: G.ink }}>
             Recent Activity
           </div>
+          <Button onClick={exportCsv} disabled={loading || logs.length === 0}>
+            Export CSV
+          </Button>
           <Button onClick={fetchLogs} disabled={loading}>
             {loading ? "Refreshing..." : "Refresh"}
           </Button>
