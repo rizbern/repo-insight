@@ -2,7 +2,9 @@ import { Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { AuthCallback } from './pages/AuthCallback';
-import { Dashboard } from './pages/Dashboard';
+import Dashboard from './pages/Dashboard';
+import { Layout } from './components/Layout';
+import AuditLog from './pages/AuditLog';
 
 function App() {
   return (
@@ -11,7 +13,10 @@ function App() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       
       <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<Dashboard />} />
+        <Route element={<Layout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/audit" element={<AuditLog />} />
+        </Route>
       </Route>
     </Routes>
   );
