@@ -47,5 +47,23 @@ export class AuditService {
 
     return { data, total, skip, take };
   }
+
+  async exportCsv(): Promise<string> {
+    const logs = await this.prisma.auditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const header = 'ID,Date,Actor,Action,Target,Details\n';
+    const rows = logs.map((log) => {
+      const details = log.metadata
+        ? JSON.stringify(log.metadata).replace(/"/g, '""')
+        : log.ipAddress || '';
+      return `${log.id},${log.createdAt.toISOString()},${log.actor},${log.actionType},${
+        log.targetRepo || ''
+      },"${details}"`;
+    });
+
+    return header + rows.join('\n');
+  }
 }
 
