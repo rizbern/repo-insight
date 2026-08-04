@@ -1,0 +1,28 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { AuditService } from './audit.service';
+import { PrismaService } from '../prisma/prisma.service';
+
+const mockPrismaService = {
+  auditLog: {
+    create: jest.fn(),
+  },
+};
+
+describe('AuditService', () => {
+  let service: AuditService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuditService,
+        { provide: PrismaService, useValue: mockPrismaService },
+      ],
+    }).compile();
+
+    service = module.get<AuditService>(AuditService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+});
