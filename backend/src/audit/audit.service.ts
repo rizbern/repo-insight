@@ -23,4 +23,29 @@ export class AuditService {
       },
     });
   }
+
+  async findAll(params?: {
+    actionType?: AuditAction;
+    targetRepo?: string;
+    skip?: number;
+    take?: number;
+  }) {
+    const { actionType, targetRepo, skip = 0, take = 50 } = params || {};
+    const where: any = {};
+    if (actionType) where.actionType = actionType;
+    if (targetRepo) where.targetRepo = targetRepo;
+
+    const [data, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return { data, total, skip, take };
+  }
 }
+
