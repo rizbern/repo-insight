@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ExpiryAction {
+  DELETE
+  ARCHIVE
+}
+
+enum UserRole {
+  ADMIN
+  TECH_LEAD
+  ENGINEERING_MANAGER
+}
+
+enum AuditAction {
+  CONFIG_UPDATED
+  REPO_ARCHIVED
+  REPO_DELETED
+  OVERRIDE_CREATED
+  OVERRIDE_REMOVED
+  COLLABORATOR_REMOVED
+  BULK_COLLABORATOR_REMOVAL
+  LOGIN
+  LOGOUT
+}
+
+model SystemConfig {
+  id                       Int          @id @default(1)
+  repoPrefix               String
+  retentionDays            Int
+  defaultExpiryAction      ExpiryAction
+  preDeletionWarningDays   Int
+
+  githubOrgName            String
+
+  updatedBy                String
+  updatedAt                DateTime     @updatedAt
+}
+
+model RepoOverride {
+  id                       Int       @id @default(autoincrement())
+
+  repoName                 String    @unique
+
+  overrideDeletionDate     DateTime
+
+  reason                   String?
+
+  setBy                    String
+
+  setAt                    DateTime  @default(now())
+
+  createdAt                DateTime  @default(now())
+
+  updatedAt                DateTime  @updatedAt
+}
+
+model AuditLog {
+  id                       Int       @id @default(autoincrement())
+
+  actor                    String
+
+  actionType               AuditAction
+
+  targetRepo               String?
+
+  metadata                 Json?
+
+  ipAddress                String?
+
+  createdAt                DateTime  @default(now())
+
+  @@index([actionType])
+  @@index([targetRepo])
+  @@index([createdAt])
+}
+
+model User {
+  id                       Int       @id @default(autoincrement())
+
+  githubUsername           String    @unique
+
+  role                     UserRole
+
+  createdAt                DateTime  @default(now())
+
+  updatedAt                DateTime  @updatedAt
+}
+
+model Notification {
+  id                       Int       @id @default(autoincrement())
+
+  repoName                 String
+
+  message                  String
+
+  isRead                   Boolean   @default(false)
+
+  createdAt                DateTime  @default(now())
+
+  @@index([repoName])
+  @@index([isRead])
+}
