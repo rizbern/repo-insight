@@ -21,8 +21,8 @@ export class GithubService {
 
   async listTestRepos(orgName: string, prefix = 'pt-') {
     try {
-      const response = await this.octokit.repos.listForOrg({
-        org: orgName,
+      const response = await this.octokit.repos.listForUser({
+        username: orgName,
         type: 'all',
         per_page: 100,
       });
