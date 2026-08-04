@@ -1,0 +1,8 @@
+DATABASE_URL="postgresql://postgres:admin@localhost:5432/repomanager?schema=public"
+CLIENT_ID="git oauth client id"
+CLIENT_SECRET="git oauth client secret"
+ALLOWED_GITHUB_USERS="your github username"
+JWT_SECRET="supersecretkey"
+GITHUB_CALLBACK_URL="http://localhost:3000/api/auth/callback"
+FRONTEND_URL="http://localhost:5173"
+GITHUB_TOKEN="your github token"
