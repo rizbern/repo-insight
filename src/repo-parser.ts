@@ -4,7 +4,6 @@ export interface ParsedRepo {
   candidateName: string;
 }
 
-
 export function parseRepoName(repoName: string): ParsedRepo {
   if (!repoName || !repoName.startsWith('pt-')) {
     throw new Error('Invalid repository name. Must start with pt-');
