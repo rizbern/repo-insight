@@ -18,12 +18,17 @@ const GithubIcon = ({ size = 24, color = "currentColor" }) => (
 );
 
 export const Login = () => {
-  const { login, token } = useAuth();
+  const { login, token, user, loading } = useAuth();
   const [searchParams] = useSearchParams();
   const error = searchParams.get('error');
 
-  // If already logged in, redirect to dashboard
-  if (token) {
+  // Show nothing while auth is being validated to avoid login page flash
+  if (loading) {
+    return null;
+  }
+
+  // Only redirect if token is valid AND user is confirmed by backend
+  if (token && user) {
     return <Navigate to="/" replace />;
   }
 

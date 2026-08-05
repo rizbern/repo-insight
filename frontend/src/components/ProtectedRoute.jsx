@@ -2,7 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export const ProtectedRoute = () => {
-  const { token, loading } = useAuth();
+  const { token, user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -14,11 +14,11 @@ export const ProtectedRoute = () => {
     );
   }
 
-  // If no token, redirect to login page
-  if (!token) {
+  // Redirect to login if no token or if token validation failed (user is null)
+  if (!token || !user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Otherwise, render the child routes
+  // Token is valid and user is authenticated — render child routes
   return <Outlet />;
 };

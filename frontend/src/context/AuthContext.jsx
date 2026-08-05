@@ -37,6 +37,8 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Failed to fetch user:', err);
+      // Network error or backend unreachable — treat as unauthenticated
+      setToken(null);
     } finally {
       setLoading(false);
     }
