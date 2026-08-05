@@ -11,12 +11,18 @@ export class AuditController {
   async getLogs(
     @Query('actionType') actionType?: AuditAction,
     @Query('targetRepo') targetRepo?: string,
+    @Query('actor') actor?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
   ) {
     return this.auditService.findAll({
       actionType,
       targetRepo,
+      actor,
+      startDate,
+      endDate,
       skip: skip ? parseInt(skip, 10) : undefined,
       take: take ? parseInt(take, 10) : undefined,
     });

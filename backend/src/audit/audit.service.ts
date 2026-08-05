@@ -27,13 +27,27 @@ export class AuditService {
   async findAll(params?: {
     actionType?: AuditAction;
     targetRepo?: string;
+    actor?: string;
+    startDate?: string;
+    endDate?: string;
     skip?: number;
     take?: number;
   }) {
-    const { actionType, targetRepo, skip = 0, take = 50 } = params || {};
+    const { actionType, targetRepo, actor, startDate, endDate, skip = 0, take = 50 } = params || {};
     const where: any = {};
     if (actionType) where.actionType = actionType;
     if (targetRepo) where.targetRepo = targetRepo;
+    if (actor) where.actor = { contains: actor, mode: 'insensitive' };
+    
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.auditLog.findMany({
