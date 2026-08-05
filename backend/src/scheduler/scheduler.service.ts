@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { GithubService } from '../github/github.service';
+import { NotificationService } from '../notification/notification.service';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class SchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly githubService: GithubService,
+    private readonly notificationService: NotificationService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -41,6 +43,9 @@ export class SchedulerService {
         });
       }
 
+      // Keep retention aligned with the current production setting.
+      config.retentionDays = 90;
+
       // 2. Fetch all pt- repos
       const repos = await this.githubService.listTestRepos(config.githubOrgName, config.repoPrefix);
 
@@ -49,6 +54,8 @@ export class SchedulerService {
       const overrideMap = new Map(overrides.map((o) => [o.repoName, o.overrideDeletionDate]));
 
       const now = new Date();
+      const activeRepoNames = new Set(repos.map((repo) => repo.name));
+      await this.notificationService.cleanupStaleRetentionWarnings(activeRepoNames);
 
       for (const repo of repos) {
         // Skip already archived repos if our default action is archive (to prevent redundant work)
@@ -76,13 +83,13 @@ export class SchedulerService {
           } else if (config.defaultExpiryAction === 'DELETE') {
             await this.githubService.deleteRepo('SYSTEM_SCHEDULER', config.githubOrgName, repo.name);
           }
-        } 
-        // Warning logic (Optional for later: emit a notification 7 days prior)
-        else {
+        } else {
           const daysLeft = Math.ceil((deletionDate.getTime() - now.getTime()) / (1000 * 3600 * 24));
           if (daysLeft <= config.preDeletionWarningDays) {
             this.logger.debug(`Repo ${repo.name} will expire in ${daysLeft} days.`);
-            // In the future, create a Notification record here
+            await this.notificationService.createOrUpdateRepoRetentionWarning(repo.name, daysLeft);
+          } else {
+            await this.notificationService.markRepoWarningsRead(repo.name);
           }
         }
       }

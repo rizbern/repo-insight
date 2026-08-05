@@ -6,6 +6,7 @@ import { AuditModule } from './audit/audit.module';
 import { GithubModule } from './github/github.module';
 import { AuthModule } from './auth/auth.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
     AuditModule,
     GithubModule,
     AuthModule,
+    NotificationModule,
     SchedulerModule,
   ],
 })
