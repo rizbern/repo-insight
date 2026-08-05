@@ -236,7 +236,7 @@ export default function Dashboard() {
         Repositories
       </h1>
       <p style={{ color: G.ink3, margin: "0 0 28px", fontSize: 13, letterSpacing: "0.01em" }}>
-        view of all repos
+        view of all repos.
       </p>
 
       {notice && (
