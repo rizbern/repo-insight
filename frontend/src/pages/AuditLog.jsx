@@ -25,6 +25,34 @@ function ActionTag({ type }) {
   return <Tag text={type} bg="rgba(255,255,255,0.06)" fg={G.ink} border={G.rim} />;
 }
 
+function formatMetadata(actionType, metadata, ipAddress) {
+  if (!metadata) {
+    return ipAddress ? `IP: ${ipAddress}` : "\u2014";
+  }
+  try {
+    switch (actionType) {
+      case 'CONFIG_UPDATED':
+        return metadata.changes 
+          ? `Changes: ${Object.keys(metadata.changes).map(k => `${k}=${metadata.changes[k]}`).join(', ')}`
+          : 'Config updated';
+      case 'OVERRIDE_CREATED':
+        const date = metadata.overrideDeletionDate ? new Date(metadata.overrideDeletionDate).toLocaleDateString() : '';
+        return `Date: ${date}${metadata.reason ? `, Reason: ${metadata.reason}` : ''}`;
+      case 'OVERRIDE_REMOVED':
+        const prev = metadata.previousDate ? new Date(metadata.previousDate).toLocaleDateString() : '';
+        return `Previous date: ${prev}`;
+      case 'COLLABORATOR_REMOVED':
+        return metadata.targetUsers ? `Removed: ${metadata.targetUsers.join(', ')}` : (metadata.targetUser ? `Removed: ${metadata.targetUser}` : 'Collaborators removed');
+      case 'COLLABORATOR_ADDED':
+        return metadata.targetUser ? `Added: ${metadata.targetUser}` : 'Collaborator added';
+      default:
+        return Object.entries(metadata).map(([k, v]) => `${k}: ${v}`).join(', ');
+    }
+  } catch (e) {
+    return JSON.stringify(metadata);
+  }
+}
+
 export default function AuditLog() {
   const { token, logout } = useAuth();
   const [logs, setLogs] = useState([]);
@@ -266,15 +294,11 @@ export default function AuditLog() {
                           overflow: "hidden",
                           textOverflow: "ellipsis"
                         }}
-                        title={log.metadata ? JSON.stringify(log.metadata) : log.ipAddress}
+                        title={formatMetadata(log.actionType, log.metadata, log.ipAddress)}
                       >
-                        {log.metadata ? (
-                          <span style={{ opacity: 0.8 }}>{JSON.stringify(log.metadata)}</span>
-                        ) : log.ipAddress ? (
-                          <span>IP: {log.ipAddress}</span>
-                        ) : (
-                          "\u2014"
-                        )}
+                        <span style={{ opacity: 0.8 }}>
+                          {formatMetadata(log.actionType, log.metadata, log.ipAddress)}
+                        </span>
                       </td>
                     </tr>
                   );
