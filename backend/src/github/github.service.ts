@@ -51,24 +51,35 @@ export class GithubService {
     }
   }
 
-  async revokeAccess(actor: string, orgName: string, repoName: string, targetUser: string) {
+  async revokeAccess(actor: string, orgName: string, repoName: string) {
     try {
-      await this.octokit.repos.removeCollaborator({
+      const { data: collaborators } = await this.octokit.repos.listCollaborators({
         owner: orgName,
         repo: repoName,
-        username: targetUser,
+        affiliation: 'outside',
       });
+
+      const removedUsers: string[] = [];
+      for (const collaborator of collaborators) {
+        await this.octokit.repos.removeCollaborator({
+          owner: orgName,
+          repo: repoName,
+          username: collaborator.login,
+        });
+        removedUsers.push(collaborator.login);
+      }
       
       await this.auditService.logAction(
         actor, 
         'COLLABORATOR_REMOVED', 
+        orgName,
         repoName, 
-        { targetUser }
+        { targetUsers: removedUsers }
       );
       
-      return { success: true };
+      return { success: true, removedUsers };
     } catch (error) {
-      this.logger.error(`Failed to revoke access for ${targetUser} on ${repoName}`, error);
+      this.logger.error(`Failed to revoke access on ${repoName}`, error);
       throw error;
     }
   }
@@ -85,6 +96,7 @@ export class GithubService {
       await this.auditService.logAction(
         actor, 
         'COLLABORATOR_ADDED', 
+        orgName,
         repoName, 
         { targetUser }
       );
@@ -104,7 +116,7 @@ export class GithubService {
         archived: true,
       });
       
-      await this.auditService.logAction(actor, 'REPO_ARCHIVED', repoName);
+      await this.auditService.logAction(actor, 'REPO_ARCHIVED', orgName, repoName);
       
       return { success: true };
     } catch (error) {
@@ -121,7 +133,7 @@ export class GithubService {
         archived: false,
       });
       
-      await this.auditService.logAction(actor, 'REPO_UNARCHIVED', repoName);
+      await this.auditService.logAction(actor, 'REPO_UNARCHIVED', orgName, repoName);
       
       return { success: true };
     } catch (error) {
@@ -137,7 +149,7 @@ export class GithubService {
         repo: repoName,
       });
       
-      await this.auditService.logAction(actor, 'REPO_DELETED', repoName);
+      await this.auditService.logAction(actor, 'REPO_DELETED', orgName, repoName);
       
       return { success: true };
     } catch (error) {

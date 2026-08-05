@@ -32,16 +32,36 @@ export class AuthService {
   ): Promise<{ access_token: string }> {
     const username: string = profile.username;
     
-    // Parse the comma-separated list of allowed users
-    const allowedUsersString = this.configService.get<string>('ALLOWED_GITHUB_USERS', '');
-    const allowedUsers = allowedUsersString
-      .split(',')
-      .map(u => u.trim().toLowerCase())
-      .filter(u => u.length > 0);
+    // Get target org from SystemConfig or fallback to ENV
+    const config = await this.prisma.systemConfig.findFirst();
+    const targetOrg = config?.githubOrgName || this.configService.get<string>('GITHUB_ORG') || 'kennethcrasto';
 
-    if (allowedUsers.length > 0 && !allowedUsers.includes(username.toLowerCase())) {
-      this.logger.warn(`User ${username} denied access — not in the allowed list.`);
-      throw new ForbiddenException(`Access denied. Your GitHub account (${username}) is not whitelisted.`);
+    // Verify org membership via GitHub API
+    try {
+      const orgsResponse = await fetch('https://api.github.com/user/orgs', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+
+      if (!orgsResponse.ok) {
+        throw new Error('Failed to fetch user orgs');
+      }
+
+      const orgs = await orgsResponse.json();
+      const isMember = 
+        username.toLowerCase() === targetOrg.toLowerCase() ||
+        orgs.some((org: any) => org.login.toLowerCase() === targetOrg.toLowerCase());
+
+      if (!isMember) {
+        this.logger.warn(`User ${username} denied access — not a member of ${targetOrg}.`);
+        throw new ForbiddenException(`Access denied. You must be a member of the ${targetOrg} organization.`);
+      }
+    } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+      this.logger.error(`Error verifying org membership for ${username}: ${error.message}`);
+      throw new ForbiddenException('Access denied. Could not verify organization membership.');
     }
 
     // Find or create the user in our database
@@ -60,7 +80,7 @@ export class AuthService {
     }
 
     // Log the login event
-    await this.auditService.logAction(username, 'LOGIN');
+    await this.auditService.logAction(username, 'LOGIN', targetOrg);
 
     // Sign and return JWT
     const payload = {

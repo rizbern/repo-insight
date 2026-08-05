@@ -32,6 +32,7 @@ export class ConfigController {
       retentionDays?: number;
       defaultExpiryAction?: ExpiryAction;
       preDeletionWarningDays?: number;
+      githubOrgName?: string;
     },
   ) {
     const actor = (req.user as any).githubUsername;
