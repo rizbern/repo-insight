@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService as NestConfigService } from '@nestjs/config';
@@ -8,6 +8,7 @@ import { ExpiryAction } from '@prisma/client';
 export class ConfigService {
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => AuditService))
     private readonly auditService: AuditService,
     private readonly envConfig: NestConfigService,
   ) {}
@@ -15,7 +16,7 @@ export class ConfigService {
   async getSystemConfig() {
     let config = await this.prisma.systemConfig.findFirst();
     if (!config) {
-      const orgName = this.envConfig.get<string>('ALLOWED_GITHUB_USERS')?.split(',')[0] || 'kennethcrasto';
+      const orgName = this.envConfig.get<string>('GITHUB_ORG') || 'south-group-tt';
       config = await this.prisma.systemConfig.create({
         data: {
           repoPrefix: 'pt-',
@@ -35,6 +36,7 @@ export class ConfigService {
       retentionDays?: number;
       defaultExpiryAction?: ExpiryAction;
       preDeletionWarningDays?: number;
+      githubOrgName?: string;
     },
     actor: string,
     ipAddress?: string,
@@ -52,6 +54,7 @@ export class ConfigService {
     await this.auditService.logAction(
       actor,
       'CONFIG_UPDATED',
+      config.githubOrgName,
       undefined,
       { changes: data },
       ipAddress,
@@ -88,9 +91,11 @@ export class ConfigService {
       },
     });
 
+    const config = await this.getSystemConfig();
     await this.auditService.logAction(
       actor,
       'OVERRIDE_CREATED',
+      config.githubOrgName,
       repoName,
       { overrideDeletionDate, reason },
       ipAddress,
@@ -112,9 +117,11 @@ export class ConfigService {
       where: { repoName },
     });
 
+    const config = await this.getSystemConfig();
     await this.auditService.logAction(
       actor,
       'OVERRIDE_REMOVED',
+      config.githubOrgName,
       repoName,
       { previousDate: override.overrideDeletionDate },
       ipAddress,
