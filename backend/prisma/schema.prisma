@@ -67,6 +67,8 @@ model AuditLog {
 
   actor                    String
 
+  orgName                  String?
+
   actionType               AuditAction
 
   targetRepo               String?

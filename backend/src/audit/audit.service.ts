@@ -9,6 +9,7 @@ export class AuditService {
   async logAction(
     actor: string,
     actionType: AuditAction,
+    orgName?: string,
     targetRepo?: string,
     metadata?: any,
     ipAddress?: string,
@@ -17,6 +18,7 @@ export class AuditService {
       data: {
         actor,
         actionType,
+        orgName,
         targetRepo,
         metadata,
         ipAddress,
@@ -28,16 +30,18 @@ export class AuditService {
     actionType?: AuditAction;
     targetRepo?: string;
     actor?: string;
+    orgName?: string;
     startDate?: string;
     endDate?: string;
     skip?: number;
     take?: number;
   }) {
-    const { actionType, targetRepo, actor, startDate, endDate, skip = 0, take = 50 } = params || {};
+    const { actionType, targetRepo, actor, orgName, startDate, endDate, skip = 0, take = 50 } = params || {};
     const where: any = {};
     if (actionType) where.actionType = actionType;
     if (targetRepo) where.targetRepo = targetRepo;
     if (actor) where.actor = { contains: actor, mode: 'insensitive' };
+    if (orgName) where.orgName = orgName;
     
     if (startDate || endDate) {
       where.createdAt = {};
@@ -62,8 +66,9 @@ export class AuditService {
     return { data, total, skip, take };
   }
 
-  async exportCsv(): Promise<string> {
+  async exportCsv(orgName: string): Promise<string> {
     const logs = await this.prisma.auditLog.findMany({
+      where: { orgName },
       orderBy: { createdAt: 'desc' },
     });
 

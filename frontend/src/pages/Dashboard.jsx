@@ -133,6 +133,42 @@ function DeleteDialog({ repo, onConfirm, onCancel }) {
   );
 }
 
+function GrantDialog({ repo, onConfirm, onCancel }) {
+  const [username, setUsername] = useState(repo.candidateName || "");
+  
+  return (
+    <Modal>
+      <div style={{ padding: "24px 24px 12px" }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px", color: G.ink }}>
+          Grant external access?
+        </h2>
+      </div>
+      <div style={{ padding: "0 24px 16px" }}>
+        <p style={{ marginTop: 0, color: G.ink2, fontSize: 13 }}>
+          Grants the outside collaborator write access to{" "}
+          <span style={{ fontFamily: G.mono, color: G.accent }}>{repo.name}</span>.
+        </p>
+        <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 6, color: G.ink }}>
+          GitHub Username
+        </label>
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="e.g., octocat"
+          style={{ ...inputStyle, width: "100%" }}
+        />
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 24px 24px" }}>
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button onClick={() => onConfirm(username)} disabled={!username.trim()}>
+          Grant access
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 export default function Dashboard() {
   const { token, logout, user, authFetch } = useAuth();
   const [repos, setRepos] = useState([]);
@@ -149,7 +185,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!token || !user?.githubUsername) return;
     Promise.all([
-      authFetch(`http://localhost:3000/api/github/repos?org=${user.githubUsername}`).then(r => r.json()),
+      authFetch(`http://localhost:3000/api/github/repos`).then(r => r.json()),
       authFetch(`http://localhost:3000/api/config`).then(r => r.json()),
       authFetch(`http://localhost:3000/api/config/overrides`).then(r => r.json())
     ])
@@ -226,29 +262,28 @@ export default function Dashboard() {
   async function act(kind, repo) {
     try {
       if (kind === "delete") {
-        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}?org=${user.githubUsername}`, {
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}`, {
           method: 'DELETE'
         });
         if (!res.ok) throw new Error('Failed');
         setRepos((prev) => prev.filter((r) => r.id !== repo.id));
         setNotice(`Deleted ${repo.name}.`);
       } else if (kind === "archive") {
-        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/archive?org=${user.githubUsername}`, {
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/archive`, {
           method: 'PATCH'
         });
         if (!res.ok) throw new Error('Failed');
         setRepos((prev) => prev.map((r) => r.id === repo.id ? { ...r, status: "archived" } : r));
         setNotice(`Archived ${repo.name}.`);
       } else if (kind === "unarchive") {
-        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/unarchive?org=${user.githubUsername}`, {
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/unarchive`, {
           method: 'PATCH'
         });
         if (!res.ok) throw new Error('Failed');
         setRepos((prev) => prev.map((r) => r.id === repo.id ? { ...r, status: "live" } : r));
         setNotice(`Unarchived ${repo.name}.`);
       } else if (kind === "revoke") {
-        const targetUser = repo.candidateName || repo.name;
-        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators/${targetUser}?org=${user.githubUsername}`, {
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators`, {
           method: 'DELETE'
         });
         if (!res.ok) throw new Error('Failed');
@@ -257,8 +292,8 @@ export default function Dashboard() {
         );
         setNotice(`Revoked external access to ${repo.name}.`);
       } else if (kind === "grant") {
-        const targetUser = repo.candidateName || repo.name;
-        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators/${targetUser}?org=${user.githubUsername}`, {
+        const targetUser = repo.targetUser;
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators/${targetUser}`, {
           method: 'PUT'
         });
         if (!res.ok) throw new Error('Failed');
@@ -722,15 +757,10 @@ export default function Dashboard() {
         />
       )}
       {dialog.kind === "grant" && (
-        <ConfirmDialog
-          title="Grant external access?"
-          body={<p style={{ marginTop: 0, color: G.ink2 }}>
-            Grants the outside collaborator write access to{" "}
-            <span style={{ fontFamily: G.mono, color: G.accent }}>{dialog.repo.name}</span>.
-          </p>}
-          confirmLabel="Grant access"
+        <GrantDialog
+          repo={dialog.repo}
           onCancel={() => setDialog({ kind: "none" })}
-          onConfirm={() => act("grant", dialog.repo)}
+          onConfirm={(username) => act("grant", { ...dialog.repo, targetUser: username })}
         />
       )}
     </>
