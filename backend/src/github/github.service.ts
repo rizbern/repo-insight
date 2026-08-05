@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Octokit } from '@octokit/rest';
 import { parseRepoName } from '../common/utils/repo-parser.util';
+import { AuditAction } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 
 @Injectable()
@@ -110,6 +111,16 @@ export class GithubService {
 
   async archiveRepo(actor: string, orgName: string, repoName: string) {
     try {
+      const repo = await this.octokit.repos.get({
+        owner: orgName,
+        repo: repoName,
+      });
+
+      if (repo.data.archived) {
+        this.logger.log(`Repo ${repoName} is already archived; skipping archive.`);
+        return { success: true, skipped: true };
+      }
+
       await this.octokit.repos.update({
         owner: orgName,
         repo: repoName,
@@ -119,7 +130,13 @@ export class GithubService {
       await this.auditService.logAction(actor, 'REPO_ARCHIVED', orgName, repoName);
       
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
+      const message = String(error?.message ?? '');
+      if (error?.status === 403 && message.includes('archived so is read-only')) {
+        this.logger.log(`Repo ${repoName} is already archived and read-only; skipping archive.`);
+        return { success: true, skipped: true };
+      }
+
       this.logger.error(`Failed to archive repo ${repoName}`, error);
       throw error;
     }
@@ -127,6 +144,16 @@ export class GithubService {
 
   async unarchiveRepo(actor: string, orgName: string, repoName: string) {
     try {
+      const repo = await this.octokit.repos.get({
+        owner: orgName,
+        repo: repoName,
+      });
+
+      if (!repo.data.archived) {
+        this.logger.log(`Repo ${repoName} is not archived; skipping unarchive.`);
+        return { success: true, skipped: true };
+      }
+
       await this.octokit.repos.update({
         owner: orgName,
         repo: repoName,
@@ -136,7 +163,12 @@ export class GithubService {
       await this.auditService.logAction(actor, 'REPO_UNARCHIVED', orgName, repoName);
       
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
+      const message = String(error?.message ?? '');
+      if (error?.status === 403 && message.includes('archived so is read-only')) {
+        this.logger.error(`Failed to unarchive repo ${repoName} because repo is archived and read-only.`, error);
+      }
+
       this.logger.error(`Failed to unarchive repo ${repoName}`, error);
       throw error;
     }
