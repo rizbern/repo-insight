@@ -88,7 +88,10 @@ function DeleteDialog({ repo, onConfirm, onCancel }) {
 export default function Dashboard() {
   const { token, logout, user, authFetch } = useAuth();
   const [repos, setRepos] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [accessFilter, setAccessFilter] = useState("");
@@ -123,7 +126,23 @@ export default function Dashboard() {
         console.error(err);
       })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, user?.githubUsername, authFetch]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    setNotificationsLoading(true);
+    authFetch(`http://localhost:3000/api/notifications?unread=true`)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch notifications');
+        return res.json();
+      })
+      .then(data => setNotifications(data))
+      .catch(err => {
+        console.error(err);
+      })
+      .finally(() => setNotificationsLoading(false));
+  }, [token, authFetch]);
 
   const visible = useMemo(() => {
     return repos.filter((r) => {
@@ -235,6 +254,91 @@ export default function Dashboard() {
         >
           <span role="status" style={{ flex: 1, color: G.accent }}>{notice}</span>
           <Button small onClick={() => setNotice(null)}>Dismiss</Button>
+        </GlassCard>
+      )}
+
+      {!notificationsLoading && (
+        <GlassCard style={{ marginBottom: 20, border: `1px solid ${G.soonBorder}`, background: G.soonBg }}>
+          <div style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: G.ink }}>Deletion warning panel</div>
+              <div style={{ marginTop: 4, color: G.ink2, fontSize: 13 }}>
+                {notifications.length > 0
+                  ? `${notifications.length} repos are 7 days or less from auto-deletion.`
+                  : 'No retention warnings for the next 7 days.'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Button small onClick={() => setNotificationsOpen((open) => !open)}>
+                {notificationsOpen ? 'Collapse' : 'Expand'}
+              </Button>
+              <Button small onClick={async () => {
+                const res = await authFetch('http://localhost:3000/api/notifications/read-all', { method: 'PATCH' });
+                if (res.ok) setNotifications([]);
+              }}>
+                Mark all read
+              </Button>
+              <Button small onClick={() => window.location.reload()}>
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {notificationsOpen && (
+            <div style={{ maxHeight: 320, overflowY: 'auto', padding: '0 18px 16px' }}>
+              {notifications.length > 0 ? (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {notifications.map((notification) => {
+                    const repo = repos.find((r) => r.name === notification.repoName);
+                    const candidateName = repo?.candidateName ?? 'Unknown candidate';
+                    const daysMatch = notification.message.match(/in (\d+) day/);
+                    const daysLeft = daysMatch ? Number(daysMatch[1]) : notification.message.includes('today') ? 0 : null;
+
+                    return (
+                      <div
+                        key={notification.id}
+                        style={{
+                          padding: '16px',
+                          borderRadius: 16,
+                          background: 'rgba(10, 12, 32, 0.92)',
+                          border: `1px solid rgba(255,255,255,0.08)`,
+                          boxShadow: `0 8px 24px rgba(0,0,0,0.14)`
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: G.ink }}>{notification.repoName}</div>
+                            <div style={{ marginTop: 5, fontSize: 12, color: G.ink2 }}>{candidateName}</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: G.imminent }}>
+                              {daysLeft === 0 ? 'Today' : `${daysLeft ?? '7'}d left`}
+                            </div>
+                            <div style={{ fontSize: 11, color: G.ink3, marginTop: 4 }}>
+                              Auto-delete warning
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ marginTop: 14, fontSize: 12, color: G.ink2, lineHeight: 1.7 }}>
+                          {notification.message}
+                        </div>
+                        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                          <span style={{ fontSize: 11, color: G.ink3 }}>{new Date(notification.createdAt).toLocaleDateString()}</span>
+                          <Button small onClick={() => window.open(`https://github.com/${user.githubUsername}/${notification.repoName}`, '_blank')}>
+                            View repo
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ padding: '18px 0 22px', color: G.ink3, fontSize: 13 }}>
+                  No repos are currently in the 7-day deletion warning window. The panel is still visible so managers can see the retention state at a glance.
+                </div>
+              )}
+            </div>
+          )}
         </GlassCard>
       )}
 
