@@ -166,7 +166,14 @@ export default function Dashboard() {
         if (!res.ok) throw new Error('Failed');
         setRepos((prev) => prev.map((r) => r.id === repo.id ? { ...r, status: "archived" } : r));
         setNotice(`Archived ${repo.name}.`);
-      } else {
+      } else if (kind === "unarchive") {
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/unarchive?org=${user.githubUsername}`, {
+          method: 'PATCH'
+        });
+        if (!res.ok) throw new Error('Failed');
+        setRepos((prev) => prev.map((r) => r.id === repo.id ? { ...r, status: "live" } : r));
+        setNotice(`Unarchived ${repo.name}.`);
+      } else if (kind === "revoke") {
         const targetUser = repo.candidateName || repo.name;
         const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators/${targetUser}?org=${user.githubUsername}`, {
           method: 'DELETE'
@@ -176,6 +183,16 @@ export default function Dashboard() {
           (prev) => prev.map((r) => r.id === repo.id ? { ...r, accessStatus: "revoked" } : r)
         );
         setNotice(`Revoked external access to ${repo.name}.`);
+      } else if (kind === "grant") {
+        const targetUser = repo.candidateName || repo.name;
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators/${targetUser}?org=${user.githubUsername}`, {
+          method: 'PUT'
+        });
+        if (!res.ok) throw new Error('Failed');
+        setRepos(
+          (prev) => prev.map((r) => r.id === repo.id ? { ...r, accessStatus: "active" } : r)
+        );
+        setNotice(`Granted external access to ${repo.name}.`);
       }
     } catch (err) {
       setNotice(`Error performing ${kind} on ${repo.name}`);
@@ -410,20 +427,36 @@ export default function Dashboard() {
                           </td>
                           <td style={tdStyle}>
                             <div style={{ display: "flex", gap: 5, justifyContent: "flex-end" }}>
-                              <Button
-                                small
-                                onClick={() => setDialog({ kind: "revoke", repo })}
-                                disabled={repo.accessStatus === "revoked"}
-                              >
-                                Revoke
-                              </Button>
-                              <Button
-                                small
-                                onClick={() => setDialog({ kind: "archive", repo })}
-                                disabled={repo.status === "archived"}
-                              >
-                                Archive
-                              </Button>
+                              {repo.accessStatus === "revoked" ? (
+                                <Button
+                                  small
+                                  onClick={() => setDialog({ kind: "grant", repo })}
+                                >
+                                  Grant
+                                </Button>
+                              ) : (
+                                <Button
+                                  small
+                                  onClick={() => setDialog({ kind: "revoke", repo })}
+                                >
+                                  Revoke
+                                </Button>
+                              )}
+                              {repo.status === "archived" ? (
+                                <Button
+                                  small
+                                  onClick={() => setDialog({ kind: "unarchive", repo })}
+                                >
+                                  Unarchive
+                                </Button>
+                              ) : (
+                                <Button
+                                  small
+                                  onClick={() => setDialog({ kind: "archive", repo })}
+                                >
+                                  Archive
+                                </Button>
+                              )}
                               <Button
                                 small
                                 variant="danger"
@@ -476,6 +509,17 @@ export default function Dashboard() {
           onConfirm={() => act("archive", dialog.repo)}
         />
       )}
+      {dialog.kind === "unarchive" && (
+        <ConfirmDialog
+          title={`Unarchive ${dialog.repo.name}?`}
+          body={<p style={{ marginTop: 0, color: G.ink2 }}>
+            This will restore the repository to an active state.
+          </p>}
+          confirmLabel="Unarchive repository"
+          onCancel={() => setDialog({ kind: "none" })}
+          onConfirm={() => act("unarchive", dialog.repo)}
+        />
+      )}
       {dialog.kind === "revoke" && (
         <ConfirmDialog
           title="Revoke external access?"
@@ -489,6 +533,18 @@ export default function Dashboard() {
           danger
           onCancel={() => setDialog({ kind: "none" })}
           onConfirm={() => act("revoke", dialog.repo)}
+        />
+      )}
+      {dialog.kind === "grant" && (
+        <ConfirmDialog
+          title="Grant external access?"
+          body={<p style={{ marginTop: 0, color: G.ink2 }}>
+            Grants the outside collaborator write access to{" "}
+            <span style={{ fontFamily: G.mono, color: G.accent }}>{dialog.repo.name}</span>.
+          </p>}
+          confirmLabel="Grant access"
+          onCancel={() => setDialog({ kind: "none" })}
+          onConfirm={() => act("grant", dialog.repo)}
         />
       )}
     </>
