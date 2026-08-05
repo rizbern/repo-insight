@@ -6,7 +6,9 @@ import {
   tdStyle,
   GlassCard,
   Tag,
-  Button
+  Button,
+  CustomSelect,
+  inputStyle
 } from "../components/Theme";
 
 function ActionTag({ type }) {
@@ -29,9 +31,22 @@ export default function AuditLog() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Filters
+  const [actorFilter, setActorFilter] = useState("");
+  const [actionTypeFilter, setActionTypeFilter] = useState("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
+
   const fetchLogs = () => {
     setLoading(true);
-    fetch(`http://localhost:3000/api/audit/logs`, {
+    
+    const params = new URLSearchParams();
+    if (actorFilter) params.append("actor", actorFilter);
+    if (actionTypeFilter) params.append("actionType", actionTypeFilter);
+    if (startDateFilter) params.append("startDate", startDateFilter);
+    if (endDateFilter) params.append("endDate", endDateFilter);
+    
+    fetch(`http://localhost:3000/api/audit/logs?${params.toString()}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => {
@@ -74,7 +89,7 @@ export default function AuditLog() {
   useEffect(() => {
     if (!token) return;
     fetchLogs();
-  }, [token]);
+  }, [token, actorFilter, actionTypeFilter, startDateFilter, endDateFilter]);
 
   return (
     <>
@@ -114,20 +129,58 @@ export default function AuditLog() {
         </GlassCard>
       )}
 
-      <GlassCard style={{ overflow: "hidden" }}>
+      <GlassCard style={{ display: "flex", flexDirection: "column" }}>
         <div
           style={{
             display: "flex",
             gap: 8,
             alignItems: "center",
+            flexWrap: "wrap",
             padding: "14px 16px",
             borderBottom: `1px solid ${G.rim}`,
-            background: "rgba(255,255,255,0.025)"
+            background: "rgba(255,255,255,0.025)",
+            borderTopLeftRadius: G.radius,
+            borderTopRightRadius: G.radius
           }}
         >
-          <div style={{ flex: 1, fontSize: 14, fontWeight: 500, color: G.ink }}>
-            Recent Activity
-          </div>
+          <input
+            style={{ ...inputStyle, minWidth: 150 }}
+            placeholder="Filter by actor"
+            value={actorFilter}
+            onChange={(e) => setActorFilter(e.target.value)}
+          />
+          <CustomSelect
+            value={actionTypeFilter}
+            onChange={setActionTypeFilter}
+            ariaLabel="Filter by action"
+            options={[
+              { value: "", label: "All actions" },
+              { value: "CONFIG_UPDATED", label: "Config Updated" },
+              { value: "REPO_ARCHIVED", label: "Archived" },
+              { value: "REPO_UNARCHIVED", label: "Unarchived" },
+              { value: "REPO_DELETED", label: "Deleted" },
+              { value: "OVERRIDE_CREATED", label: "Override Added" },
+              { value: "COLLABORATOR_ADDED", label: "Access Granted" },
+              { value: "COLLABORATOR_REMOVED", label: "Access Revoked" },
+              { value: "LOGIN", label: "Login" }
+            ]}
+          />
+          <input
+            type="date"
+            style={{ ...inputStyle, minWidth: 140 }}
+            value={startDateFilter}
+            onChange={(e) => setStartDateFilter(e.target.value)}
+            title="Start date"
+          />
+          <span style={{ color: G.ink3, fontSize: 13 }}>to</span>
+          <input
+            type="date"
+            style={{ ...inputStyle, minWidth: 140 }}
+            value={endDateFilter}
+            onChange={(e) => setEndDateFilter(e.target.value)}
+            title="End date"
+          />
+          <div style={{ flex: 1 }} />
           <Button onClick={exportCsv} disabled={loading || logs.length === 0}>
             Export CSV
           </Button>
@@ -239,7 +292,9 @@ export default function AuditLog() {
             color: G.ink3,
             fontFamily: G.mono,
             letterSpacing: "0.03em",
-            background: "rgba(255,255,255,0.018)"
+            background: "rgba(255,255,255,0.018)",
+            borderBottomLeftRadius: G.radius,
+            borderBottomRightRadius: G.radius
           }}
         >
           Showing {logs.length} events
