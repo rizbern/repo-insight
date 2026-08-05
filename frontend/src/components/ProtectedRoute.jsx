@@ -1,8 +1,22 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useEffect } from 'react';
 
 export const ProtectedRoute = () => {
-  const { token, loading } = useAuth();
+  const { token, user, loading, revalidate } = useAuth();
+  const location = useLocation();
+
+  // Re-validate token with the backend on every route change
+  useEffect(() => {
+    revalidate();
+  }, [location.pathname, revalidate]);
+
+  // Re-validate when the browser tab regains focus
+  useEffect(() => {
+    const handleFocus = () => revalidate();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [revalidate]);
 
   if (loading) {
     return (
@@ -14,11 +28,9 @@ export const ProtectedRoute = () => {
     );
   }
 
-  // If no token, redirect to login page
-  if (!token) {
+  if (!token || !user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Otherwise, render the child routes
   return <Outlet />;
 };

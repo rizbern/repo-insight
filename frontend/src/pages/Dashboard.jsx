@@ -86,7 +86,7 @@ function DeleteDialog({ repo, onConfirm, onCancel }) {
 }
 
 export default function Dashboard() {
-  const { token, logout, user } = useAuth();
+  const { token, logout, user, authFetch } = useAuth();
   const [repos, setRepos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -97,9 +97,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!token || !user?.githubUsername) return;
-    fetch(`http://localhost:3000/api/github/repos?org=${user.githubUsername}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    authFetch(`http://localhost:3000/api/github/repos?org=${user.githubUsername}`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch');
         return res.json();
@@ -123,7 +121,6 @@ export default function Dashboard() {
       })
       .catch(err => {
         console.error(err);
-        if (err.message.includes('401')) logout();
       })
       .finally(() => setLoading(false));
   }, [token]);
@@ -156,26 +153,23 @@ export default function Dashboard() {
   async function act(kind, repo) {
     try {
       if (kind === "delete") {
-        const res = await fetch(`http://localhost:3000/api/github/repos/${repo.name}?org=${user.githubUsername}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}?org=${user.githubUsername}`, {
+          method: 'DELETE'
         });
         if (!res.ok) throw new Error('Failed');
         setRepos((prev) => prev.filter((r) => r.id !== repo.id));
         setNotice(`Deleted ${repo.name}.`);
       } else if (kind === "archive") {
-        const res = await fetch(`http://localhost:3000/api/github/repos/${repo.name}/archive?org=${user.githubUsername}`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}` }
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/archive?org=${user.githubUsername}`, {
+          method: 'PATCH'
         });
         if (!res.ok) throw new Error('Failed');
         setRepos((prev) => prev.map((r) => r.id === repo.id ? { ...r, status: "archived" } : r));
         setNotice(`Archived ${repo.name}.`);
       } else {
         const targetUser = repo.candidateName || repo.name;
-        const res = await fetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators/${targetUser}?org=${user.githubUsername}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators/${targetUser}?org=${user.githubUsername}`, {
+          method: 'DELETE'
         });
         if (!res.ok) throw new Error('Failed');
         setRepos(

@@ -18,12 +18,17 @@ const GithubIcon = ({ size = 24, color = "currentColor" }) => (
 );
 
 export const Login = () => {
-  const { login, token } = useAuth();
+  const { login, token, user, loading, sessionExpired, setSessionExpired, logout } = useAuth();
   const [searchParams] = useSearchParams();
   const error = searchParams.get('error');
 
-  // If already logged in, redirect to dashboard
-  if (token) {
+  // Wait for token validation to finish before deciding what to show
+  if (loading) {
+    return null;
+  }
+
+  // If already authenticated in this session, go to dashboard
+  if (token && user) {
     return <Navigate to="/" replace />;
   }
 
@@ -48,13 +53,24 @@ export const Login = () => {
           </p>
         </div>
 
+        {sessionExpired && (
+          <div className="glass-panel" style={{ background: 'rgba(255, 159, 10, 0.1)', borderColor: 'rgba(255, 159, 10, 0.3)', color: '#ff9f0a', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ flex: 1 }}>Your session has expired. Please sign in again.</span>
+            <button
+              onClick={() => setSessionExpired(false)}
+              style={{ background: 'none', border: 'none', color: '#ff9f0a', cursor: 'pointer', fontSize: '1.1rem', padding: '0 4px', lineHeight: 1 }}
+              aria-label="Dismiss"
+            >×</button>
+          </div>
+        )}
+
         {error && (
           <div className="glass-panel" style={{ background: 'rgba(255, 69, 58, 0.1)', borderColor: 'rgba(255, 69, 58, 0.3)', color: 'var(--accent-red)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
             {error}
           </div>
         )}
 
-        <button onClick={login} className="glass-button primary" style={{ width: '100%', justifyContent: 'center' }}>
+        <button onClick={() => { logout(); login(); }} className="glass-button primary" style={{ width: '100%', justifyContent: 'center' }}>
           <GithubIcon size={20} />
           Continue with GitHub
         </button>
