@@ -20,6 +20,54 @@ import {
   urgencyOf
 } from "../components/Theme";
 
+function ExtendDialog({ repo, onConfirm, onCancel }) {
+  const [days, setDays] = useState(30);
+  const [reason, setReason] = useState("");
+  
+  const handleConfirm = () => {
+    const newDate = new Date(repo.scheduledDeletionAt);
+    newDate.setDate(newDate.getDate() + parseInt(days, 10));
+    onConfirm(newDate.toISOString(), reason);
+  };
+
+  return (
+    <Modal>
+      <div style={{ padding: "24px 24px 12px" }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px", color: G.ink }}>
+          Extend Retention for {repo.name}
+        </h2>
+      </div>
+      <div style={{ padding: "0 24px 16px" }}>
+        <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 6, color: G.ink }}>
+          Additional Days to Extend
+        </label>
+        <input
+          type="number"
+          value={days}
+          onChange={(e) => setDays(e.target.value)}
+          style={{ ...inputStyle, width: "100%", marginBottom: 16 }}
+        />
+        <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 6, color: G.ink }}>
+          Reason (Optional)
+        </label>
+        <input
+          type="text"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="e.g., Client requested more time"
+          style={{ ...inputStyle, width: "100%" }}
+        />
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 24px 24px" }}>
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button onClick={handleConfirm} disabled={!days || isNaN(days) || parseInt(days) <= 0}>
+          Extend
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 function DeleteDialog({ repo, onConfirm, onCancel }) {
   const [typed, setTyped] = useState("");
   const matches = typed === repo.name;
@@ -100,13 +148,19 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!token || !user?.githubUsername) return;
-    authFetch(`http://localhost:3000/api/github/repos?org=${user.githubUsername}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch');
-        return res.json();
-      })
-      .then(data => {
-        const mapped = data.map(repo => {
+    Promise.all([
+      authFetch(`http://localhost:3000/api/github/repos?org=${user.githubUsername}`).then(r => r.json()),
+      authFetch(`http://localhost:3000/api/config`).then(r => r.json()),
+      authFetch(`http://localhost:3000/api/config/overrides`).then(r => r.json())
+    ])
+      .then(([reposData, configData, overridesData]) => {
+        const overrideMap = new Map(overridesData.map(o => [o.repoName, o.overrideDeletionDate]));
+        const retentionDays = configData?.retentionDays || 90;
+
+        const mapped = reposData.map(repo => {
+          const defaultDeletion = new Date(new Date(repo.createdAt).getTime() + retentionDays * 86400000).toISOString();
+          const deletionDate = overrideMap.get(repo.name) || defaultDeletion;
+
           return {
             id: repo.name,
             name: repo.name,
@@ -115,7 +169,7 @@ export default function Dashboard() {
             candidateName: repo.parsed?.candidateName || null,
             nameParsed: !!repo.parsed?.isTestRepo,
             repoCreatedAt: repo.createdAt,
-            scheduledDeletionAt: new Date(new Date(repo.createdAt).getTime() + 90 * 86400000).toISOString(),
+            scheduledDeletionAt: deletionDate,
             status: repo.archived ? 'archived' : 'live',
             accessStatus: 'active'
           };
@@ -212,6 +266,21 @@ export default function Dashboard() {
           (prev) => prev.map((r) => r.id === repo.id ? { ...r, accessStatus: "active" } : r)
         );
         setNotice(`Granted external access to ${repo.name}.`);
+      } else if (kind === "extend") {
+        const res = await authFetch(`http://localhost:3000/api/config/overrides`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            repoName: repo.name,
+            overrideDeletionDate: repo.newDate,
+            reason: repo.reason || ""
+          })
+        });
+        if (!res.ok) throw new Error('Failed');
+        setRepos(
+          (prev) => prev.map((r) => r.id === repo.id ? { ...r, scheduledDeletionAt: repo.newDate } : r)
+        );
+        setNotice(`Extended retention for ${repo.name}.`);
       }
     } catch (err) {
       setNotice(`Error performing ${kind} on ${repo.name}`);
@@ -236,7 +305,7 @@ export default function Dashboard() {
         Repositories
       </h1>
       <p style={{ color: G.ink3, margin: "0 0 28px", fontSize: 13, letterSpacing: "0.01em" }}>
-        view of all repos
+        view of all repos.
       </p>
 
       {notice && (
@@ -525,12 +594,18 @@ export default function Dashboard() {
                           </td>
                           <td style={tdStyle}>
                             <StatusTag status={repo.status} />
-                          </td>
+                  </td>
                           <td style={tdStyle}>
                             <AccessTag status={repo.accessStatus} />
                           </td>
                           <td style={tdStyle}>
                             <div style={{ display: "flex", gap: 5, justifyContent: "flex-end" }}>
+                              <Button
+                                small
+                                onClick={() => setDialog({ kind: "extend", repo })}
+                              >
+                                Extend
+                              </Button>
                               {repo.accessStatus === "revoked" ? (
                                 <Button
                                   small
@@ -599,6 +674,13 @@ export default function Dashboard() {
           repo={dialog.repo}
           onCancel={() => setDialog({ kind: "none" })}
           onConfirm={() => act("delete", dialog.repo)}
+        />
+      )}
+      {dialog.kind === "extend" && (
+        <ExtendDialog
+          repo={dialog.repo}
+          onCancel={() => setDialog({ kind: "none" })}
+          onConfirm={(newDate, reason) => act("extend", { ...dialog.repo, newDate, reason })}
         />
       )}
       {dialog.kind === "archive" && (
