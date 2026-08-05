@@ -43,8 +43,7 @@ export class SchedulerService {
         });
       }
 
-      // Keep retention aligned with the current production setting.
-      config.retentionDays = 90;
+
 
       // 2. Fetch all pt- repos
       const repos = await this.githubService.listTestRepos(config.githubOrgName, config.repoPrefix);
