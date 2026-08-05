@@ -20,6 +20,54 @@ import {
   urgencyOf
 } from "../components/Theme";
 
+function ExtendDialog({ repo, onConfirm, onCancel }) {
+  const [days, setDays] = useState(30);
+  const [reason, setReason] = useState("");
+  
+  const handleConfirm = () => {
+    const newDate = new Date(repo.scheduledDeletionAt);
+    newDate.setDate(newDate.getDate() + parseInt(days, 10));
+    onConfirm(newDate.toISOString(), reason);
+  };
+
+  return (
+    <Modal>
+      <div style={{ padding: "24px 24px 12px" }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px", color: G.ink }}>
+          Extend Retention for {repo.name}
+        </h2>
+      </div>
+      <div style={{ padding: "0 24px 16px" }}>
+        <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 6, color: G.ink }}>
+          Additional Days to Extend
+        </label>
+        <input
+          type="number"
+          value={days}
+          onChange={(e) => setDays(e.target.value)}
+          style={{ ...inputStyle, width: "100%", marginBottom: 16 }}
+        />
+        <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 6, color: G.ink }}>
+          Reason (Optional)
+        </label>
+        <input
+          type="text"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="e.g., Client requested more time"
+          style={{ ...inputStyle, width: "100%" }}
+        />
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 24px 24px" }}>
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button onClick={handleConfirm} disabled={!days || isNaN(days) || parseInt(days) <= 0}>
+          Extend
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 function DeleteDialog({ repo, onConfirm, onCancel }) {
   const [typed, setTyped] = useState("");
   const matches = typed === repo.name;
@@ -88,7 +136,10 @@ function DeleteDialog({ repo, onConfirm, onCancel }) {
 export default function Dashboard() {
   const { token, logout, user, authFetch } = useAuth();
   const [repos, setRepos] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [accessFilter, setAccessFilter] = useState("");
@@ -97,13 +148,19 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!token || !user?.githubUsername) return;
-    authFetch(`http://localhost:3000/api/github/repos?org=${user.githubUsername}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch');
-        return res.json();
-      })
-      .then(data => {
-        const mapped = data.map(repo => {
+    Promise.all([
+      authFetch(`http://localhost:3000/api/github/repos?org=${user.githubUsername}`).then(r => r.json()),
+      authFetch(`http://localhost:3000/api/config`).then(r => r.json()),
+      authFetch(`http://localhost:3000/api/config/overrides`).then(r => r.json())
+    ])
+      .then(([reposData, configData, overridesData]) => {
+        const overrideMap = new Map(overridesData.map(o => [o.repoName, o.overrideDeletionDate]));
+        const retentionDays = configData?.retentionDays || 90;
+
+        const mapped = reposData.map(repo => {
+          const defaultDeletion = new Date(new Date(repo.createdAt).getTime() + retentionDays * 86400000).toISOString();
+          const deletionDate = overrideMap.get(repo.name) || defaultDeletion;
+
           return {
             id: repo.name,
             name: repo.name,
@@ -112,7 +169,7 @@ export default function Dashboard() {
             candidateName: repo.parsed?.candidateName || null,
             nameParsed: !!repo.parsed?.isTestRepo,
             repoCreatedAt: repo.createdAt,
-            scheduledDeletionAt: new Date(new Date(repo.createdAt).getTime() + 90 * 86400000).toISOString(),
+            scheduledDeletionAt: deletionDate,
             status: repo.archived ? 'archived' : 'live',
             accessStatus: 'active'
           };
@@ -123,7 +180,23 @@ export default function Dashboard() {
         console.error(err);
       })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, user?.githubUsername, authFetch]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    setNotificationsLoading(true);
+    authFetch(`http://localhost:3000/api/notifications?unread=true`)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch notifications');
+        return res.json();
+      })
+      .then(data => setNotifications(data))
+      .catch(err => {
+        console.error(err);
+      })
+      .finally(() => setNotificationsLoading(false));
+  }, [token, authFetch]);
 
   const visible = useMemo(() => {
     return repos.filter((r) => {
@@ -166,7 +239,14 @@ export default function Dashboard() {
         if (!res.ok) throw new Error('Failed');
         setRepos((prev) => prev.map((r) => r.id === repo.id ? { ...r, status: "archived" } : r));
         setNotice(`Archived ${repo.name}.`);
-      } else {
+      } else if (kind === "unarchive") {
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/unarchive?org=${user.githubUsername}`, {
+          method: 'PATCH'
+        });
+        if (!res.ok) throw new Error('Failed');
+        setRepos((prev) => prev.map((r) => r.id === repo.id ? { ...r, status: "live" } : r));
+        setNotice(`Unarchived ${repo.name}.`);
+      } else if (kind === "revoke") {
         const targetUser = repo.candidateName || repo.name;
         const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators/${targetUser}?org=${user.githubUsername}`, {
           method: 'DELETE'
@@ -176,6 +256,31 @@ export default function Dashboard() {
           (prev) => prev.map((r) => r.id === repo.id ? { ...r, accessStatus: "revoked" } : r)
         );
         setNotice(`Revoked external access to ${repo.name}.`);
+      } else if (kind === "grant") {
+        const targetUser = repo.candidateName || repo.name;
+        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators/${targetUser}?org=${user.githubUsername}`, {
+          method: 'PUT'
+        });
+        if (!res.ok) throw new Error('Failed');
+        setRepos(
+          (prev) => prev.map((r) => r.id === repo.id ? { ...r, accessStatus: "active" } : r)
+        );
+        setNotice(`Granted external access to ${repo.name}.`);
+      } else if (kind === "extend") {
+        const res = await authFetch(`http://localhost:3000/api/config/overrides`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            repoName: repo.name,
+            overrideDeletionDate: repo.newDate,
+            reason: repo.reason || ""
+          })
+        });
+        if (!res.ok) throw new Error('Failed');
+        setRepos(
+          (prev) => prev.map((r) => r.id === repo.id ? { ...r, scheduledDeletionAt: repo.newDate } : r)
+        );
+        setNotice(`Extended retention for ${repo.name}.`);
       }
     } catch (err) {
       setNotice(`Error performing ${kind} on ${repo.name}`);
@@ -200,7 +305,7 @@ export default function Dashboard() {
         Repositories
       </h1>
       <p style={{ color: G.ink3, margin: "0 0 28px", fontSize: 13, letterSpacing: "0.01em" }}>
-        view of all repos
+        view of all repos.
       </p>
 
       {notice && (
@@ -218,6 +323,91 @@ export default function Dashboard() {
         >
           <span role="status" style={{ flex: 1, color: G.accent }}>{notice}</span>
           <Button small onClick={() => setNotice(null)}>Dismiss</Button>
+        </GlassCard>
+      )}
+
+      {!notificationsLoading && (
+        <GlassCard style={{ marginBottom: 20, border: `1px solid ${G.soonBorder}`, background: G.soonBg }}>
+          <div style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: G.ink }}>Deletion warning panel</div>
+              <div style={{ marginTop: 4, color: G.ink2, fontSize: 13 }}>
+                {notifications.length > 0
+                  ? `${notifications.length} repos are 7 days or less from auto-deletion.`
+                  : 'No retention warnings for the next 7 days.'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Button small onClick={() => setNotificationsOpen((open) => !open)}>
+                {notificationsOpen ? 'Collapse' : 'Expand'}
+              </Button>
+              <Button small onClick={async () => {
+                const res = await authFetch('http://localhost:3000/api/notifications/read-all', { method: 'PATCH' });
+                if (res.ok) setNotifications([]);
+              }}>
+                Mark all read
+              </Button>
+              <Button small onClick={() => window.location.reload()}>
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {notificationsOpen && (
+            <div style={{ maxHeight: 320, overflowY: 'auto', padding: '0 18px 16px' }}>
+              {notifications.length > 0 ? (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {notifications.map((notification) => {
+                    const repo = repos.find((r) => r.name === notification.repoName);
+                    const candidateName = repo?.candidateName ?? 'Unknown candidate';
+                    const daysMatch = notification.message.match(/in (\d+) day/);
+                    const daysLeft = daysMatch ? Number(daysMatch[1]) : notification.message.includes('today') ? 0 : null;
+
+                    return (
+                      <div
+                        key={notification.id}
+                        style={{
+                          padding: '16px',
+                          borderRadius: 16,
+                          background: 'rgba(10, 12, 32, 0.92)',
+                          border: `1px solid rgba(255,255,255,0.08)`,
+                          boxShadow: `0 8px 24px rgba(0,0,0,0.14)`
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: G.ink }}>{notification.repoName}</div>
+                            <div style={{ marginTop: 5, fontSize: 12, color: G.ink2 }}>{candidateName}</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: G.imminent }}>
+                              {daysLeft === 0 ? 'Today' : `${daysLeft ?? '7'}d left`}
+                            </div>
+                            <div style={{ fontSize: 11, color: G.ink3, marginTop: 4 }}>
+                              Auto-delete warning
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ marginTop: 14, fontSize: 12, color: G.ink2, lineHeight: 1.7 }}>
+                          {notification.message}
+                        </div>
+                        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                          <span style={{ fontSize: 11, color: G.ink3 }}>{new Date(notification.createdAt).toLocaleDateString()}</span>
+                          <Button small onClick={() => window.open(`https://github.com/${user.githubUsername}/${notification.repoName}`, '_blank')}>
+                            View repo
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ padding: '18px 0 22px', color: G.ink3, fontSize: 13 }}>
+                  No repos are currently in the 7-day deletion warning window. The panel is still visible so managers can see the retention state at a glance.
+                </div>
+              )}
+            </div>
+          )}
         </GlassCard>
       )}
 
@@ -404,7 +594,7 @@ export default function Dashboard() {
                           </td>
                           <td style={tdStyle}>
                             <StatusTag status={repo.status} />
-                          </td>
+                  </td>
                           <td style={tdStyle}>
                             <AccessTag status={repo.accessStatus} />
                           </td>
@@ -412,18 +602,40 @@ export default function Dashboard() {
                             <div style={{ display: "flex", gap: 5, justifyContent: "flex-end" }}>
                               <Button
                                 small
-                                onClick={() => setDialog({ kind: "revoke", repo })}
-                                disabled={repo.accessStatus === "revoked"}
+                                onClick={() => setDialog({ kind: "extend", repo })}
                               >
-                                Revoke
+                                Extend
                               </Button>
-                              <Button
-                                small
-                                onClick={() => setDialog({ kind: "archive", repo })}
-                                disabled={repo.status === "archived"}
-                              >
-                                Archive
-                              </Button>
+                              {repo.accessStatus === "revoked" ? (
+                                <Button
+                                  small
+                                  onClick={() => setDialog({ kind: "grant", repo })}
+                                >
+                                  Grant
+                                </Button>
+                              ) : (
+                                <Button
+                                  small
+                                  onClick={() => setDialog({ kind: "revoke", repo })}
+                                >
+                                  Revoke
+                                </Button>
+                              )}
+                              {repo.status === "archived" ? (
+                                <Button
+                                  small
+                                  onClick={() => setDialog({ kind: "unarchive", repo })}
+                                >
+                                  Unarchive
+                                </Button>
+                              ) : (
+                                <Button
+                                  small
+                                  onClick={() => setDialog({ kind: "archive", repo })}
+                                >
+                                  Archive
+                                </Button>
+                              )}
                               <Button
                                 small
                                 variant="danger"
@@ -464,6 +676,13 @@ export default function Dashboard() {
           onConfirm={() => act("delete", dialog.repo)}
         />
       )}
+      {dialog.kind === "extend" && (
+        <ExtendDialog
+          repo={dialog.repo}
+          onCancel={() => setDialog({ kind: "none" })}
+          onConfirm={(newDate, reason) => act("extend", { ...dialog.repo, newDate, reason })}
+        />
+      )}
       {dialog.kind === "archive" && (
         <ConfirmDialog
           title={`Archive ${dialog.repo.name}?`}
@@ -474,6 +693,17 @@ export default function Dashboard() {
           confirmLabel="Archive repository"
           onCancel={() => setDialog({ kind: "none" })}
           onConfirm={() => act("archive", dialog.repo)}
+        />
+      )}
+      {dialog.kind === "unarchive" && (
+        <ConfirmDialog
+          title={`Unarchive ${dialog.repo.name}?`}
+          body={<p style={{ marginTop: 0, color: G.ink2 }}>
+            This will restore the repository to an active state.
+          </p>}
+          confirmLabel="Unarchive repository"
+          onCancel={() => setDialog({ kind: "none" })}
+          onConfirm={() => act("unarchive", dialog.repo)}
         />
       )}
       {dialog.kind === "revoke" && (
@@ -489,6 +719,18 @@ export default function Dashboard() {
           danger
           onCancel={() => setDialog({ kind: "none" })}
           onConfirm={() => act("revoke", dialog.repo)}
+        />
+      )}
+      {dialog.kind === "grant" && (
+        <ConfirmDialog
+          title="Grant external access?"
+          body={<p style={{ marginTop: 0, color: G.ink2 }}>
+            Grants the outside collaborator write access to{" "}
+            <span style={{ fontFamily: G.mono, color: G.accent }}>{dialog.repo.name}</span>.
+          </p>}
+          confirmLabel="Grant access"
+          onCancel={() => setDialog({ kind: "none" })}
+          onConfirm={() => act("grant", dialog.repo)}
         />
       )}
     </>
