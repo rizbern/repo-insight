@@ -1,6 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditAction } from '@prisma/client';
+import { AuditAction, Prisma } from '@prisma/client';
+
+function formatMetadataForCsv(actionType: string, metadata: any, ipAddress: string | null): string {
+  if (!metadata) {
+    return ipAddress ? `IP: ${ipAddress}` : '';
+  }
+  try {
+    const meta = metadata as any;
+    switch (actionType) {
+      case 'CONFIG_UPDATED':
+        return meta.changes 
+          ? `Changes: ${Object.keys(meta.changes).map(k => `${k}=${meta.changes[k]}`).join(', ')}`
+          : 'Config updated';
+      case 'OVERRIDE_CREATED':
+        const date = meta.overrideDeletionDate ? new Date(meta.overrideDeletionDate).toLocaleDateString() : '';
+        return `Date: ${date}${meta.reason ? `, Reason: ${meta.reason}` : ''}`;
+      case 'OVERRIDE_REMOVED':
+        const prev = meta.previousDate ? new Date(meta.previousDate).toLocaleDateString() : '';
+        return `Previous date: ${prev}`;
+      case 'COLLABORATOR_REMOVED':
+        return meta.targetUsers ? `Removed: ${meta.targetUsers.join(', ')}` : (meta.targetUser ? `Removed: ${meta.targetUser}` : 'Collaborators removed');
+      case 'COLLABORATOR_ADDED':
+        return meta.targetUser ? `Added: ${meta.targetUser}` : 'Collaborator added';
+      default:
+        return Object.entries(meta).map(([k, v]) => `${k}: ${v}`).join(', ');
+    }
+  } catch (e) {
+    return JSON.stringify(metadata);
+  }
+}
 
 @Injectable()
 export class AuditService {
@@ -74,9 +103,10 @@ export class AuditService {
 
     const header = 'ID,Date,Actor,Action,Target,Details\n';
     const rows = logs.map((log) => {
-      const details = log.metadata
-        ? JSON.stringify(log.metadata).replace(/"/g, '""')
-        : log.ipAddress || '';
+      let details = formatMetadataForCsv(log.actionType, log.metadata, log.ipAddress);
+      // Escape double quotes for CSV
+      details = details.replace(/"/g, '""');
+      
       return `${log.id},${log.createdAt.toISOString()},${log.actor},${log.actionType},${
         log.targetRepo || ''
       },"${details}"`;
