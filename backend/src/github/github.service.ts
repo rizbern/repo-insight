@@ -73,6 +73,29 @@ export class GithubService {
     }
   }
 
+  async grantAccess(actor: string, orgName: string, repoName: string, targetUser: string) {
+    try {
+      await this.octokit.repos.addCollaborator({
+        owner: orgName,
+        repo: repoName,
+        username: targetUser,
+        permission: 'push', // default to push (write) access, adjust if necessary
+      });
+      
+      await this.auditService.logAction(
+        actor, 
+        'COLLABORATOR_ADDED', 
+        repoName, 
+        { targetUser }
+      );
+      
+      return { success: true };
+    } catch (error) {
+      this.logger.error(`Failed to grant access for ${targetUser} on ${repoName}`, error);
+      throw error;
+    }
+  }
+
   async archiveRepo(actor: string, orgName: string, repoName: string) {
     try {
       await this.octokit.repos.update({
@@ -86,6 +109,23 @@ export class GithubService {
       return { success: true };
     } catch (error) {
       this.logger.error(`Failed to archive repo ${repoName}`, error);
+      throw error;
+    }
+  }
+
+  async unarchiveRepo(actor: string, orgName: string, repoName: string) {
+    try {
+      await this.octokit.repos.update({
+        owner: orgName,
+        repo: repoName,
+        archived: false,
+      });
+      
+      await this.auditService.logAction(actor, 'REPO_UNARCHIVED', repoName);
+      
+      return { success: true };
+    } catch (error) {
+      this.logger.error(`Failed to unarchive repo ${repoName}`, error);
       throw error;
     }
   }
