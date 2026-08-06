@@ -5,6 +5,7 @@ import { AuthCallback } from './pages/AuthCallback';
 import Dashboard from './pages/Dashboard';
 import { Layout } from './components/Layout';
 import AuditLog from './pages/AuditLog';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/audit" element={<AuditLog />} />
+            <Route path="/settings" element={<Settings />} />
         </Route>
       </Route>
     </Routes>

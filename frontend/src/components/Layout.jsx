@@ -133,7 +133,7 @@ export function Layout() {
         <nav style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <NavItem to="/" label="Repositories" />
           <NavItem to="/audit" label="Audit log" />
-          <NavItem to="/settings" label="Settings" disabled />
+          <NavItem to="/settings" label="Settings"  />
         </nav>
       </aside>
 
