@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { NotificationModule } from './notification/notification.module';
 import { AppConfigModule } from './config/config.module';
+import { WebhookModule } from './webhook/webhook.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AppConfigModule } from './config/config.module';
     NotificationModule,
     SchedulerModule,
     AppConfigModule,
+    WebhookModule,
   ],
 })
 export class AppModule {}
