@@ -32,11 +32,7 @@ function formatMetadata(actionType, metadata, ipAddress) {
   try {
     switch (actionType) {
       case 'CONFIG_UPDATED':
-<<<<<<< HEAD
         return metadata.changes
-=======
-        return metadata.changes 
->>>>>>> 1c05dafd7307ac1a5fb91daf47f31a5ff31d992a
           ? `Changes: ${Object.keys(metadata.changes).map(k => `${k}=${metadata.changes[k]}`).join(', ')}`
           : 'Config updated';
       case 'OVERRIDE_CREATED':
