@@ -10,7 +10,11 @@ function formatMetadataForCsv(actionType: string, metadata: any, ipAddress: stri
     const meta = metadata as any;
     switch (actionType) {
       case 'CONFIG_UPDATED':
+<<<<<<< HEAD
+        return meta.changes
+=======
         return meta.changes 
+>>>>>>> 1c05dafd7307ac1a5fb91daf47f31a5ff31d992a
           ? `Changes: ${Object.keys(meta.changes).map(k => `${k}=${meta.changes[k]}`).join(', ')}`
           : 'Config updated';
       case 'OVERRIDE_CREATED':
@@ -33,7 +37,7 @@ function formatMetadataForCsv(actionType: string, metadata: any, ipAddress: stri
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async logAction(
     actor: string,
@@ -71,7 +75,7 @@ export class AuditService {
     if (targetRepo) where.targetRepo = targetRepo;
     if (actor) where.actor = { contains: actor, mode: 'insensitive' };
     if (orgName) where.orgName = orgName;
-    
+
     if (startDate || endDate) {
       where.createdAt = {};
       if (startDate) where.createdAt.gte = new Date(startDate);
@@ -106,10 +110,16 @@ export class AuditService {
       let details = formatMetadataForCsv(log.actionType, log.metadata, log.ipAddress);
       // Escape double quotes for CSV
       details = details.replace(/"/g, '""');
+<<<<<<< HEAD
+
+      return `${log.id},${log.createdAt.toISOString()},${log.actor},${log.actionType},${log.targetRepo || ''
+        },"${details}"`;
+=======
       
       return `${log.id},${log.createdAt.toISOString()},${log.actor},${log.actionType},${
         log.targetRepo || ''
       },"${details}"`;
+>>>>>>> 1c05dafd7307ac1a5fb91daf47f31a5ff31d992a
     });
 
     return header + rows.join('\n');
