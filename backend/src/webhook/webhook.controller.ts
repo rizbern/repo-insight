@@ -9,7 +9,7 @@ export class WebhookController {
   constructor(
     private readonly webhookService: WebhookService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   @Post()
   async handleWebhook(
