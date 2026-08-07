@@ -10,6 +10,7 @@ import { SettingsModule } from './settings/settings.module';
 import { NotificationModule } from './notification/notification.module';
 import { AppConfigModule } from './config/config.module';
 import { WebhookModule } from './webhook/webhook.module';
+import {SettingsModule} from "./settings/settings.module";
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { WebhookModule } from './webhook/webhook.module';
 
     AppConfigModule,
     WebhookModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}
