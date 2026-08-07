@@ -189,5 +189,30 @@ export class GithubService {
       throw error;
     }
   }
+
+  async fetchRecentEvents(orgName: string) {
+    try {
+      const { data: user } = await this.octokit.users.getAuthenticated();
+      
+      try {
+        const { data } = await this.octokit.activity.listOrgEventsForAuthenticatedUser({
+          username: user.login,
+          org: orgName,
+          per_page: 100,
+        });
+        return data;
+      } catch (e) {
+        // Fallback to received events for the user (dashboard feed) if not an org
+        const { data } = await this.octokit.activity.listReceivedEventsForUser({
+          username: user.login,
+          per_page: 100,
+        });
+        return data;
+      }
+    } catch (error) {
+      this.logger.error(`Failed to fetch events for org ${orgName}`, error);
+      return [];
+    }
+  }
 }
 
