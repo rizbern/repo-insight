@@ -10,7 +10,7 @@ export class GithubController {
   constructor(
     private readonly githubService: GithubService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   @Get('repos')
   async listRepos(
