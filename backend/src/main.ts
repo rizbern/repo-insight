@@ -3,7 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.useGlobalPipes(
       new ValidationPipe({
@@ -20,6 +20,17 @@ async function bootstrap() {
   });
 
   await app.listen(process.env.PORT ?? 3000);
+
+  if (process.env.WEBHOOK_PROXY_URL) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const SmeeClient = require('smee-client');
+    const smee = new SmeeClient({
+      source: process.env.WEBHOOK_PROXY_URL,
+      target: `http://localhost:${process.env.PORT ?? 3000}/api/github/webhook`,
+      logger: console,
+    });
+    smee.start();
+  }
 }
 
 bootstrap();
