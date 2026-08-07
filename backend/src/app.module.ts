@@ -6,7 +6,6 @@ import { AuditModule } from './audit/audit.module';
 import { GithubModule } from './github/github.module';
 import { AuthModule } from './auth/auth.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
-import { SettingsModule } from './settings/settings.module';
 import { NotificationModule } from './notification/notification.module';
 import { AppConfigModule } from './config/config.module';
 import { WebhookModule } from './webhook/webhook.module';
@@ -28,7 +27,6 @@ import {SettingsModule} from "./settings/settings.module";
 
     AppConfigModule,
     WebhookModule,
-    SettingsModule,
   ],
 })
 export class AppModule {}
