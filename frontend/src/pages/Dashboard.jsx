@@ -172,6 +172,7 @@ function GrantDialog({ repo, onConfirm, onCancel }) {
 export default function Dashboard() {
   const { token, logout, user, authFetch } = useAuth();
   const [repos, setRepos] = useState([]);
+  const [config, setConfig] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
@@ -182,6 +183,8 @@ export default function Dashboard() {
   const [dialog, setDialog] = useState({ kind: "none" });
   const [notice, setNotice] = useState(null);
 
+  const warningDays = config?.preDeletionWarningDays || 7;
+
   useEffect(() => {
     if (!token || !user?.githubUsername) return;
     Promise.all([
@@ -190,6 +193,7 @@ export default function Dashboard() {
       authFetch(`http://localhost:3000/api/config/overrides`).then(r => r.json())
     ])
       .then(([reposData, configData, overridesData]) => {
+        setConfig(configData);
         const overrideMap = new Map(overridesData.map(o => [o.repoName, o.overrideDeletionDate]));
         const retentionDays = configData?.retentionDays || 90;
 
@@ -254,11 +258,11 @@ export default function Dashboard() {
     const revoked = repos.filter((r) => r.accessStatus === "revoked").length;
     const soon = repos.filter((r) => {
       const d = daysUntil(r.scheduledDeletionAt);
-      return d >= 0 && d < 10;
+      return d >= 0 && d <= warningDays;
     }).length;
     const overdue = repos.filter((r) => daysUntil(r.scheduledDeletionAt) < 0).length;
     return { total: repos.length, live, archived, revoked, soon, overdue };
-  }, [repos]);
+  }, [repos, warningDays]);
 
   async function act(kind, repo) {
     try {
@@ -369,8 +373,8 @@ export default function Dashboard() {
               <div style={{ fontSize: 15, fontWeight: 700, color: G.ink }}>Deletion warning panel</div>
               <div style={{ marginTop: 4, color: G.ink2, fontSize: 13 }}>
                 {notifications.length > 0
-                  ? `${notifications.length} repos are 7 days or less from auto-deletion.`
-                  : 'No retention warnings for the next 7 days.'}
+                  ? `${notifications.length} repos are ${warningDays} days or less from auto-deletion.`
+                  : `No retention warnings for the next ${warningDays} days.`}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -417,7 +421,7 @@ export default function Dashboard() {
                           </div>
                           <div style={{ textAlign: 'right' }}>
                             <div style={{ fontSize: 13, fontWeight: 700, color: G.imminent }}>
-                              {daysLeft === 0 ? 'Today' : `${daysLeft ?? '7'}d left`}
+                              {daysLeft === 0 ? 'Today' : `${daysLeft ?? warningDays}d left`}
                             </div>
                             <div style={{ fontSize: 11, color: G.ink3, marginTop: 4 }}>
                               Auto-delete warning
@@ -439,7 +443,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div style={{ padding: '18px 0 22px', color: G.ink3, fontSize: 13 }}>
-                  No repos are currently in the 7-day deletion warning window. The panel is still visible so managers can see the retention state at a glance.
+                  No repos are currently in the {warningDays}-day deletion warning window. The panel is still visible so managers can see the retention state at a glance.
                 </div>
               )}
             </div>
@@ -467,7 +471,7 @@ export default function Dashboard() {
             <Stat value={stats.live} label="Live" />
             <Stat value={stats.archived} label="Archived" />
             <Stat value={stats.revoked} label="Access revoked" />
-            <Stat value={stats.soon} label="Expiring in 7 days" alert={stats.soon > 0} />
+            <Stat value={stats.soon} label={`Expiring in ${warningDays} days`} alert={stats.soon > 0} />
             <Stat value={stats.overdue} label="Past deletion date" alert={stats.overdue > 0} />
           </div>
 

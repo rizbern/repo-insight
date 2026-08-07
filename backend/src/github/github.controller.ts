@@ -18,7 +18,7 @@ export class GithubController {
   ) {
     const config = await this.configService.getSystemConfig();
     const [repos, overrides, retentionHistory] = await Promise.all([
-      this.githubService.listTestRepos(config.githubOrgName, prefix),
+      this.githubService.listTestRepos(config.githubOrgName, prefix || config.repoPrefix),
       this.configService.getOverrides(),
       this.configService.getRetentionHistory(),
     ]);
