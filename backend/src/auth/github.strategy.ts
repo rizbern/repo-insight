@@ -13,7 +13,7 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
         'GITHUB_CALLBACK_URL',
         'http://localhost:3000/auth/github/callback',
       ),
-      scope: ['read:user', 'read:org', 'repo', 'admin:org', 'delete_repo'],
+      scope: ['read:user', 'read:org', 'repo', 'admin:org', 'admin:org_hook', 'delete_repo'],
     });
   }
 

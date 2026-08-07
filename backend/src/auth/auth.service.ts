@@ -17,7 +17,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) {}
+  ) { }
 
   /**
    * Validates a GitHub user after OAuth callback.
@@ -31,7 +31,7 @@ export class AuthService {
     profile: any,
   ): Promise<{ access_token: string }> {
     const username: string = profile.username;
-    
+
     // Get target org from SystemConfig or fallback to ENV
     const config = await this.prisma.systemConfig.findFirst();
     const targetOrg = config?.githubOrgName || this.configService.get<string>('GITHUB_ORG') || 'rizbern';
@@ -50,7 +50,7 @@ export class AuthService {
       }
 
       const orgs = await orgsResponse.json();
-      const isMember = 
+      const isMember =
         username.toLowerCase() === targetOrg.toLowerCase() ||
         orgs.some((org: any) => org.login.toLowerCase() === targetOrg.toLowerCase());
 
@@ -63,6 +63,48 @@ export class AuthService {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error verifying org membership for ${username}: ${message}`);
       throw new ForbiddenException('Access denied. Could not verify organization membership.');
+    }
+
+    // Verify Webhook Setup
+    const proxyUrl = this.configService.get<string>('WEBHOOK_PROXY_URL');
+    if (!proxyUrl || !proxyUrl.includes('smee.io')) {
+      this.logger.warn(`User ${username} denied access — invalid or missing WEBHOOK_PROXY_URL locally.`);
+      throw new ForbiddenException('Access denied. You must configure a valid WEBHOOK_PROXY_URL in your .env to connect to the organization webhooks before logging in.');
+    }
+
+    try {
+      const systemToken = this.configService.get<string>('GITHUB_TOKEN');
+      const hooksResponse = await fetch(`https://api.github.com/orgs/${targetOrg}/hooks`, {
+        headers: {
+          Authorization: `Bearer ${systemToken}`,
+          Accept: 'application/vnd.github.v3+json',
+          'User-Agent': 'RepoManager',
+        },
+      });
+
+      if (!hooksResponse.ok) {
+        const errorText = await hooksResponse.text();
+        this.logger.error(`Failed to fetch hooks using backend PAT for ${targetOrg}. Status: ${hooksResponse.status}, Body: ${errorText}`);
+        throw new Error(`Failed to fetch organization hooks (${hooksResponse.status}). Ensure your backend GITHUB_TOKEN has the 'admin:org_hook' permission.`);
+      }
+
+      const hooks = await hooksResponse.json();
+
+      const normalizeUrl = (url: string) => (url || '').replace(/\/$/, '').toLowerCase();
+      const targetUrl = normalizeUrl(proxyUrl);
+
+      const hasWebhook = hooks.some((hook: any) => normalizeUrl(hook.config?.url) === targetUrl);
+
+      if (!hasWebhook) {
+        const foundUrls = hooks.map((h: any) => h.config?.url).join(', ') || 'none';
+        this.logger.warn(`User ${username} denied access — GitHub org ${targetOrg} has no webhook matching ${proxyUrl}. Found URLs: ${foundUrls}`);
+        throw new ForbiddenException(`Access denied. The GitHub organization '${targetOrg}' does not have an active webhook pointing to your local proxy URL (${proxyUrl}).`);
+      }
+    } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error verifying webhooks for ${targetOrg}: ${message}`);
+      throw new ForbiddenException(`Access denied. Could not verify organization webhooks: ${message}`);
     }
 
     // Find or create the user in our database
@@ -81,7 +123,7 @@ export class AuthService {
     }
 
     // Log the login event
-    await this.auditService.logAction(username, 'LOGIN', targetOrg);
+    //await this.auditService.logAction(username, 'LOGIN', targetOrg);
 
     // Sign and return JWT
     const payload = {
