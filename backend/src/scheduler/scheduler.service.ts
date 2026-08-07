@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GithubService } from '../github/github.service';
 import { NotificationService } from '../notification/notification.service';
 import { ConfigService } from '@nestjs/config';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class SchedulerService {
@@ -14,6 +15,7 @@ export class SchedulerService {
     private readonly githubService: GithubService,
     private readonly notificationService: NotificationService,
     private readonly configService: ConfigService,
+    private readonly auditService: AuditService,
   ) {}
 
   // For testing purposes, we run this every minute.
@@ -43,7 +45,39 @@ export class SchedulerService {
         });
       }
 
+      // 1.5 Fetch recent events and sync audit log
+      try {
+        const events = await this.githubService.fetchRecentEvents(config.githubOrgName);
+        for (const event of events.reverse()) { // Reverse to process oldest first
+          const actor = event.actor?.login || 'github';
+          const eventId = event.id;
+          const repoName = event.repo?.name?.split('/')[1] || event.repo?.name;
 
+          if (event.type === 'MemberEvent') {
+            const payload = event.payload as any;
+            const targetUser = payload.member?.login;
+            const action = payload.action;
+
+            if (action === 'added') {
+              await this.auditService.logAction(actor, 'COLLABORATOR_ADDED', config.githubOrgName, repoName, { targetUser }, undefined, eventId);
+            } else if (action === 'removed') {
+              await this.auditService.logAction(actor, 'COLLABORATOR_REMOVED', config.githubOrgName, repoName, { targetUser }, undefined, eventId);
+            }
+          } else if (event.type === 'RepositoryEvent') {
+            const action = event.payload.action;
+            if (action === 'archived') {
+              await this.auditService.logAction(actor, 'REPO_ARCHIVED', config.githubOrgName, repoName, undefined, undefined, eventId);
+            } else if (action === 'unarchived') {
+              await this.auditService.logAction(actor, 'REPO_UNARCHIVED', config.githubOrgName, repoName, undefined, undefined, eventId);
+            } else if (action === 'deleted') {
+              await this.auditService.logAction(actor, 'REPO_DELETED', config.githubOrgName, repoName, undefined, undefined, eventId);
+            }
+          }
+        }
+        this.logger.log(`Synced latest GitHub events.`);
+      } catch (err) {
+        this.logger.error('Failed to sync recent github events', err);
+      }
 
       // 2. Fetch all pt- repos
       const repos = await this.githubService.listTestRepos(config.githubOrgName, config.repoPrefix);

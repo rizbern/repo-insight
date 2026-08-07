@@ -42,7 +42,27 @@ export class AuditService {
     targetRepo?: string,
     metadata?: any,
     ipAddress?: string,
+    githubEventId?: string,
   ) {
+    if (githubEventId) {
+      // Check for duplicates
+      const existing = await this.prisma.auditLog.findFirst({
+        where: {
+          metadata: {
+            path: ['githubEventId'],
+            equals: githubEventId,
+          },
+        },
+      });
+
+      if (existing) {
+        return existing; // Skip if it already exists
+      }
+      
+      // Inject the event ID into metadata
+      metadata = { ...metadata, githubEventId };
+    }
+
     return this.prisma.auditLog.create({
       data: {
         actor,
