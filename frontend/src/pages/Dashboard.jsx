@@ -191,10 +191,12 @@ export default function Dashboard() {
     ])
       .then(([reposData, configData, overridesData]) => {
         const overrideMap = new Map(overridesData.map(o => [o.repoName, o.overrideDeletionDate]));
-        const retentionDays = configData?.retentionDays || 5;
+        const retentionDays = configData?.retentionDays || 90;
+
         const mapped = reposData.map(repo => {
           const defaultDeletion = new Date(new Date(repo.createdAt).getTime() + retentionDays * 86400000).toISOString();
-          const deletionDate = overrideMap.get(repo.name) || defaultDeletion;
+          // Determine the effective deletion date based on the override or default retention policy
+          const deletionDate = repo.scheduledDeletionAt || overrideMap.get(repo.name) || defaultDeletion;
 
           return {
             id: repo.name,

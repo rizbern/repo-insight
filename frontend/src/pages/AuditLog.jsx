@@ -67,13 +67,13 @@ export default function AuditLog() {
 
   const fetchLogs = () => {
     setLoading(true);
-
+    
     const params = new URLSearchParams();
     if (actorFilter) params.append("actor", actorFilter);
     if (actionTypeFilter) params.append("actionType", actionTypeFilter);
     if (startDateFilter) params.append("startDate", startDateFilter);
     if (endDateFilter) params.append("endDate", endDateFilter);
-
+    
     fetch(`http://localhost:3000/api/audit/logs?${params.toString()}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
