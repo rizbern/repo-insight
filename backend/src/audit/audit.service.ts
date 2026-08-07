@@ -10,11 +10,7 @@ function formatMetadataForCsv(actionType: string, metadata: any, ipAddress: stri
     const meta = metadata as any;
     switch (actionType) {
       case 'CONFIG_UPDATED':
-<<<<<<< HEAD
         return meta.changes
-=======
-        return meta.changes 
->>>>>>> 1c05dafd7307ac1a5fb91daf47f31a5ff31d992a
           ? `Changes: ${Object.keys(meta.changes).map(k => `${k}=${meta.changes[k]}`).join(', ')}`
           : 'Config updated';
       case 'OVERRIDE_CREATED':
@@ -110,19 +106,11 @@ export class AuditService {
       let details = formatMetadataForCsv(log.actionType, log.metadata, log.ipAddress);
       // Escape double quotes for CSV
       details = details.replace(/"/g, '""');
-<<<<<<< HEAD
 
       return `${log.id},${log.createdAt.toISOString()},${log.actor},${log.actionType},${log.targetRepo || ''
         },"${details}"`;
-=======
-      
-      return `${log.id},${log.createdAt.toISOString()},${log.actor},${log.actionType},${
-        log.targetRepo || ''
-      },"${details}"`;
->>>>>>> 1c05dafd7307ac1a5fb91daf47f31a5ff31d992a
     });
 
     return header + rows.join('\n');
   }
 }
-
