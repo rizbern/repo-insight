@@ -9,6 +9,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { NotificationModule } from './notification/notification.module';
 import { AppConfigModule } from './config/config.module';
 import { WebhookModule } from './webhook/webhook.module';
+import {SettingsModule} from "./settings/settings.module";
 
 @Module({
   imports: [
@@ -22,6 +23,8 @@ import { WebhookModule } from './webhook/webhook.module';
     AuthModule,
     NotificationModule,
     SchedulerModule,
+    SettingsModule,
+
     AppConfigModule,
     WebhookModule,
   ],

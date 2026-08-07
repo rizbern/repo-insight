@@ -10,7 +10,7 @@ function formatMetadataForCsv(actionType: string, metadata: any, ipAddress: stri
     const meta = metadata as any;
     switch (actionType) {
       case 'CONFIG_UPDATED':
-        return meta.changes
+        return meta.changes 
           ? `Changes: ${Object.keys(meta.changes).map(k => `${k}=${meta.changes[k]}`).join(', ')}`
           : 'Config updated';
       case 'OVERRIDE_CREATED':
@@ -71,7 +71,6 @@ export class AuditService {
     if (targetRepo) where.targetRepo = targetRepo;
     if (actor) where.actor = { contains: actor, mode: 'insensitive' };
     if (orgName) where.orgName = orgName;
-
     if (startDate || endDate) {
       where.createdAt = {};
       if (startDate) where.createdAt.gte = new Date(startDate);
@@ -114,4 +113,3 @@ export class AuditService {
     return header + rows.join('\n');
   }
 }
-

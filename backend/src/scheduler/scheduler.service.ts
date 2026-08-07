@@ -48,13 +48,37 @@ export class SchedulerService {
       // 2. Fetch all pt- repos
       const repos = await this.githubService.listTestRepos(config.githubOrgName, config.repoPrefix);
 
-      // 3. Fetch any repo overrides
+      // 3. Fetch any repo overrides and retention history records
       const overrides = await this.prisma.repoOverride.findMany();
       const overrideMap = new Map(overrides.map((o) => [o.repoName, o.overrideDeletionDate]));
+      // Fetch retention history records, ensuring at least one record exists
+      let retentionHistories = await this.prisma.systemConfigHistory.findMany({
+        orderBy: { effectiveAt: 'asc' },
+      });
+
+      if (retentionHistories.length === 0) {
+        retentionHistories = [
+          {
+            retentionDays: config.retentionDays,
+            effectiveAt: new Date(0),
+          } as any,
+        ];
+      }
 
       const now = new Date();
       const activeRepoNames = new Set(repos.map((repo) => repo.name));
       await this.notificationService.cleanupStaleRetentionWarnings(activeRepoNames);
+
+      const getRetentionDaysForRepo = (createdAt: Date) => {
+        const history = retentionHistories.filter((h) => h.effectiveAt <= createdAt).pop();
+        if (history) {
+          return history.retentionDays;
+        }
+
+        return retentionHistories.length > 0
+          ? retentionHistories[0].retentionDays
+          : config.retentionDays;
+      };
 
       for (const repo of repos) {
         // Skip already archived repos if our default action is archive (to prevent redundant work)
@@ -63,14 +87,15 @@ export class SchedulerService {
         }
 
         const createdAt = new Date(repo.createdAt || new Date());
-        let deletionDate = new Date(createdAt);
-        
-        // Calculate default deletion date
-        deletionDate.setDate(deletionDate.getDate() + config.retentionDays);
+        let deletionDate: Date;
 
-        // Check if there is an override
+        // Apply repo override if present
         if (overrideMap.has(repo.name)) {
           deletionDate = overrideMap.get(repo.name)!;
+        } else {
+          const retentionDaysForRepo = getRetentionDaysForRepo(createdAt);
+          deletionDate = new Date(createdAt);
+          deletionDate.setDate(deletionDate.getDate() + retentionDaysForRepo);
         }
 
         // If the deletion date has passed, we take action

@@ -17,7 +17,33 @@ export class GithubController {
     @Query('prefix') prefix?: string,
   ) {
     const config = await this.configService.getSystemConfig();
-    return this.githubService.listTestRepos(config.githubOrgName, prefix);
+    const [repos, overrides, retentionHistory] = await Promise.all([
+      this.githubService.listTestRepos(config.githubOrgName, prefix),
+      this.configService.getOverrides(),
+      this.configService.getRetentionHistory(),
+    ]);
+
+    const overrideMap = new Map(overrides.map((o) => [o.repoName, o.overrideDeletionDate]));
+    const getRetentionDaysForRepo = (createdAt: Date) => {
+      const history = retentionHistory.filter((h) => h.effectiveAt <= createdAt).pop();
+      if (history) {
+        return history.retentionDays;
+      }
+      return retentionHistory.length > 0
+        ? retentionHistory[0].retentionDays
+        : config.retentionDays;
+    };
+
+    return repos.map((repo) => {
+      const createdAt = repo.createdAt ? new Date(repo.createdAt) : new Date();
+      const retentionDaysForRepo = getRetentionDaysForRepo(createdAt);
+      const defaultDeletion = new Date(createdAt.getTime() + retentionDaysForRepo * 86400000).toISOString();
+      const scheduledDeletionAt = overrideMap.get(repo.name) || defaultDeletion;
+      return {
+        ...repo,
+        scheduledDeletionAt,
+      };
+    });
   }
 
   @Delete('repos/:repoName/collaborators')

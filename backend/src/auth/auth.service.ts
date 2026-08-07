@@ -34,7 +34,7 @@ export class AuthService {
     
     // Get target org from SystemConfig or fallback to ENV
     const config = await this.prisma.systemConfig.findFirst();
-    const targetOrg = config?.githubOrgName || this.configService.get<string>('GITHUB_ORG') || 'kennethcrasto';
+    const targetOrg = config?.githubOrgName || this.configService.get<string>('GITHUB_ORG') || 'rizbern';
 
     // Verify org membership via GitHub API
     try {
@@ -60,7 +60,8 @@ export class AuthService {
       }
     } catch (error) {
       if (error instanceof ForbiddenException) throw error;
-      this.logger.error(`Error verifying org membership for ${username}: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error verifying org membership for ${username}: ${message}`);
       throw new ForbiddenException('Access denied. Could not verify organization membership.');
     }
 

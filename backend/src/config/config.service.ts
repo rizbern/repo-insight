@@ -21,10 +21,18 @@ export class ConfigService {
         data: {
           repoPrefix: 'pt-',
           retentionDays: 90,
+          retentionDaysEffectiveAt: new Date(), //newer repos to follow new retention days (keeps old repos with old retention days)
           defaultExpiryAction: 'DELETE',
           preDeletionWarningDays: 7,
           githubOrgName: orgName,
           updatedBy: 'SYSTEM',
+        },
+      });
+      // for the first time, create a history record with the initial retention days
+      await this.prisma.systemConfigHistory.create({
+        data: {
+          retentionDays: config.retentionDays,
+          effectiveAt: new Date(),
         },
       });
     }
@@ -42,11 +50,25 @@ export class ConfigService {
     ipAddress?: string,
   ) {
     const config = await this.getSystemConfig();
+    // If retentionDays is being updated, create a new history record
+    if (data.retentionDays !== undefined && data.retentionDays !== config.retentionDays) {
+      await this.prisma.systemConfigHistory.create({
+        data: {
+          retentionDays: data.retentionDays,
+          effectiveAt: new Date(),
+        },
+      });
+    }
 
     const updatedConfig = await this.prisma.systemConfig.update({
       where: { id: config.id },
       data: {
         ...data,
+        // Update retentionDaysEffectiveAt only if retentionDays has changed
+        retentionDaysEffectiveAt:
+          data.retentionDays !== undefined && data.retentionDays !== config.retentionDays
+            ? new Date()
+            : config.retentionDaysEffectiveAt,
         updatedBy: actor,
       },
     });
@@ -67,6 +89,24 @@ export class ConfigService {
     return this.prisma.repoOverride.findMany({
       orderBy: { createdAt: 'desc' },
     });
+  }
+  // Fetch retention history records, ensuring at least one record exists
+  async getRetentionHistory() {
+    let histories = await this.prisma.systemConfigHistory.findMany({
+      orderBy: { effectiveAt: 'asc' },
+    });
+    // If no history records exist, create a default one based on the current system config
+    if (histories.length === 0) {
+      const config = await this.getSystemConfig();
+      histories = [
+        {
+          retentionDays: config.retentionDays,
+          effectiveAt: new Date(0),
+        } as any,
+      ];
+    }
+
+    return histories;
   }
 
   async setOverride(
