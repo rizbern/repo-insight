@@ -20,6 +20,8 @@ import {
   urgencyOf
 } from "../components/Theme";
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
 function ExtendDialog({ repo, onConfirm, onCancel }) {
   const [days, setDays] = useState(30);
   const [reason, setReason] = useState("");
@@ -195,9 +197,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (!token || !user?.githubUsername) return;
     Promise.all([
-      authFetch(`http://localhost:3000/api/github/repos`).then(r => r.json()),
-      authFetch(`http://localhost:3000/api/config`).then(r => r.json()),
-      authFetch(`http://localhost:3000/api/config/overrides`).then(r => r.json())
+      authFetch(`${API_BASE}/github/repos`).then(r => r.json()),
+      authFetch(`${API_BASE}/config`).then(r => r.json()),
+      authFetch(`${API_BASE}/config/overrides`).then(r => r.json())
     ])
       .then(([reposData, configData, overridesData]) => {
         setConfig(configData);
@@ -234,7 +236,7 @@ export default function Dashboard() {
     if (!token) return;
 
     setNotificationsLoading(true);
-    authFetch(`http://localhost:3000/api/notifications?unread=true`)
+    authFetch(`${API_BASE}/notifications?unread=true`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch notifications');
         return res.json();
@@ -274,28 +276,28 @@ export default function Dashboard() {
   async function act(kind, repo) {
     try {
       if (kind === "delete") {
-        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}`, {
+        const res = await authFetch(`${API_BASE}/github/repos/${repo.name}`, {
           method: 'DELETE'
         });
         if (!res.ok) throw new Error('Failed');
         setRepos((prev) => prev.filter((r) => r.id !== repo.id));
         setNotice(`Deleted ${repo.name}.`);
       } else if (kind === "archive") {
-        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/archive`, {
+        const res = await authFetch(`${API_BASE}/github/repos/${repo.name}/archive`, {
           method: 'PATCH'
         });
         if (!res.ok) throw new Error('Failed');
         setRepos((prev) => prev.map((r) => r.id === repo.id ? { ...r, status: "archived" } : r));
         setNotice(`Archived ${repo.name}.`);
       } else if (kind === "unarchive") {
-        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/unarchive`, {
+        const res = await authFetch(`${API_BASE}/github/repos/${repo.name}/unarchive`, {
           method: 'PATCH'
         });
         if (!res.ok) throw new Error('Failed');
         setRepos((prev) => prev.map((r) => r.id === repo.id ? { ...r, status: "live" } : r));
         setNotice(`Unarchived ${repo.name}.`);
       } else if (kind === "revoke") {
-        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators`, {
+        const res = await authFetch(`${API_BASE}/github/repos/${repo.name}/collaborators`, {
           method: 'DELETE'
         });
         if (!res.ok) throw new Error('Failed');
@@ -305,7 +307,7 @@ export default function Dashboard() {
         setNotice(`Revoked external access to ${repo.name}.`);
       } else if (kind === "grant") {
         const targetUser = repo.targetUser;
-        const res = await authFetch(`http://localhost:3000/api/github/repos/${repo.name}/collaborators/${targetUser}`, {
+        const res = await authFetch(`${API_BASE}/github/repos/${repo.name}/collaborators/${targetUser}`, {
           method: 'PUT'
         });
         if (!res.ok) throw new Error('Failed');
@@ -314,7 +316,7 @@ export default function Dashboard() {
         );
         setNotice(`Granted external access to ${repo.name}.`);
       } else if (kind === "extend") {
-        const res = await authFetch(`http://localhost:3000/api/config/overrides`, {
+        const res = await authFetch(`${API_BASE}/config/overrides`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -389,7 +391,7 @@ export default function Dashboard() {
                 {notificationsOpen ? 'Collapse' : 'Expand'}
               </Button>
               <Button small onClick={async () => {
-                const res = await authFetch('http://localhost:3000/api/notifications/read-all', { method: 'PATCH' });
+                const res = await authFetch(`${API_BASE}/notifications/read-all`, { method: 'PATCH' });
                 if (res.ok) setNotifications([]);
               }}>
                 Mark all read

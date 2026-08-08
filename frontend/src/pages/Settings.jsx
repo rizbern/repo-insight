@@ -8,7 +8,7 @@ import {
     CustomSelect
 } from "../components/Theme";
 
-const API = "http://localhost:3000/api/settings";
+const API = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/settings`;
 
 export default function Settings() {
     const { token, authFetch } = useAuth();

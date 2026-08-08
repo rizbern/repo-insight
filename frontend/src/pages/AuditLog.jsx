@@ -11,6 +11,8 @@ import {
   inputStyle
 } from "../components/Theme";
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
 function ActionTag({ type }) {
   // Color coding for different audit actions
   if (type.includes("DELETE") || type.includes("REMOVED")) {
@@ -74,7 +76,7 @@ export default function AuditLog() {
     if (startDateFilter) params.append("startDate", startDateFilter);
     if (endDateFilter) params.append("endDate", endDateFilter);
     
-    fetch(`http://localhost:3000/api/audit/logs?${params.toString()}`, {
+    fetch(`${API_BASE}/audit/logs?${params.toString()}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => {
@@ -95,7 +97,7 @@ export default function AuditLog() {
 
   const exportCsv = async () => {
     try {
-      const res = await fetch(`http://localhost:3000/api/audit/export`, {
+      const res = await fetch(`${API_BASE}/audit/export`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to export CSV');
