@@ -35,7 +35,7 @@ You need a running instance of PostgreSQL (either installed locally or hosted vi
 To integrate with GitHub, you need an OAuth App and a Personal Access Token (PAT).
 
 **Create an OAuth App:**
-1. Go to your GitHub Profile -> **Settings** -> **Developer Settings** -> **OAuth Apps**.
+1. Go to your **GitHub Organization** Profile -> **Settings** -> **Developer Settings** -> **OAuth Apps**.
 2. Click **New OAuth App**.
 3. Set the **Homepage URL** to `http://localhost:5173`.
 4. Set the **Authorization callback URL** to `http://localhost:3000/auth/github/callback`.
