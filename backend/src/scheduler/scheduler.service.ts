@@ -22,6 +22,11 @@ export class SchedulerService {
   // In production, this should be @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   @Cron(CronExpression.EVERY_MINUTE)
   async handleAutoDeletion() {
+    if (this.configService.get<string>('ENABLE_SCHEDULER') === 'false') {
+      this.logger.debug('Scheduler is disabled (ENABLE_SCHEDULER=false). Skipping auto-deletion check.');
+      return;
+    }
+
     this.logger.log('Running daily auto-deletion check...');
 
     try {

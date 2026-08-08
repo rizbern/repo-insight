@@ -104,3 +104,42 @@ npm run dev              # Starts the Vite React server on port 5173
 2. Click **Continue with GitHub**.
 3. Ensure you grant the OAuth app access to your Organization on the GitHub consent screen.
 4. Once authenticated, you will be redirected to your dashboard!
+
+---
+
+## ☁️ Free Cloud Deployment (Team Setup)
+
+If you are setting this up for a team, you should **not** have multiple developers running the scheduler locally against the same GitHub Organization, as this causes race conditions and duplicates audit logs.
+
+You can host the entire "Production" stack for **100% free** using modern serverless platforms:
+
+### 1. The Shared Database (Free)
+Use **[Neon.tech](https://neon.tech/)** or **[Supabase](https://supabase.com/)** for a free serverless PostgreSQL database.
+- Create an account and grab your `DATABASE_URL`.
+- Share this URL with your team so everyone connects to the *same* data.
+
+### 2. The Central Backend (Free)
+Host your NestJS backend on **[Render.com](https://render.com/)** or **[Railway](https://railway.app/)**.
+- Deploy the `backend/` folder as a Node Web Service.
+- Ensure all environment variables (including the `DATABASE_URL` above) are set in the cloud dashboard.
+- *Note:* Render's free tier sleeps after 15 minutes. Use a free cron service like **[cron-job.org](https://cron-job.org/)** to ping your backend API right before midnight every day to wake it up so the auto-deletion scheduler runs reliably!
+
+### 3. The Webhooks (Free)
+Once your backend is live on Render/Railway (e.g., `https://my-repo-insight.onrender.com`):
+- Go to your GitHub Organization Webhooks.
+- Change the webhook URL to point directly to your cloud backend: `https://my-repo-insight.onrender.com/api/github/webhook`.
+- You no longer need to use `smee.io`!
+
+### 4. The Frontend (Free)
+Deploy your React frontend to **[Vercel](https://vercel.com/)** or **[Netlify](https://www.netlify.com/)**.
+- Connect your GitHub repository.
+- Ensure the build command is `npm run build` and the output directory is `dist`.
+- Set the `FRONTEND_URL` environment variable on your backend to match this new Vercel URL.
+
+### Local Development (For the Team)
+Once the central cloud instance is running the daily scheduler, your local developers should add the following flag to their local `backend/.env` files:
+```env
+# Disable the local scheduler so only the cloud backend deletes repos
+ENABLE_SCHEDULER="false"
+```
+This ensures that developers can run the app locally, query the shared database, and develop new features *without* their local machines accidentally deleting repositories!

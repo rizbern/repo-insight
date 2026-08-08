@@ -30,16 +30,19 @@ function ExtendDialog({ repo, onConfirm, onCancel }) {
     onConfirm(newDate.toISOString(), reason);
   };
 
+  const parsedDays = parseInt(days, 10);
+  const isNegative = parsedDays < 0;
+
   return (
     <Modal>
       <div style={{ padding: "24px 24px 12px" }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px", color: G.ink }}>
-          Extend Retention for {repo.name}
+          Adjust Retention for {repo.name}
         </h2>
       </div>
       <div style={{ padding: "0 24px 16px" }}>
         <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 6, color: G.ink }}>
-          Additional Days to Extend
+          Days to Adjust (use negative to shorten)
         </label>
         <input
           type="number"
@@ -60,8 +63,12 @@ function ExtendDialog({ repo, onConfirm, onCancel }) {
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 24px 24px" }}>
         <Button onClick={onCancel}>Cancel</Button>
-        <Button onClick={handleConfirm} disabled={!days || isNaN(days) || parseInt(days) <= 0}>
-          Extend
+        <Button 
+          onClick={handleConfirm} 
+          disabled={!days || isNaN(days) || parsedDays === 0}
+          variant={isNegative ? "danger" : undefined}
+        >
+          {isNegative ? "Shorten" : "Extend"}
         </Button>
       </div>
     </Modal>
@@ -644,7 +651,7 @@ export default function Dashboard() {
                                 small
                                 onClick={() => setDialog({ kind: "extend", repo })}
                               >
-                                Extend
+                                Adjust
                               </Button>
                               {repo.accessStatus === "revoked" ? (
                                 <Button
