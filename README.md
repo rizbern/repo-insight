@@ -2,7 +2,7 @@
 
 RepoManager is a centralized GitHub Organization repository lifecycle management tool. It is designed for Tech Leads and Administrators to automatically manage test repositories, enforce retention policies, and maintain a strict, tamper-proof audit log of repository and collaborator activity.
 
-## 🌟 Key Features
+## Key Features
 
 - **Automated Lifecycle Management:** Automatically deletes or archives repositories that match a specific prefix (e.g., `pt-*`) after a configurable retention period (default 90 days).
 - **Dashboard & Insights:** A sleek interface providing real-time statistics, a list of active repositories, and warnings for repositories nearing their expiration date.
@@ -13,7 +13,7 @@ RepoManager is a centralized GitHub Organization repository lifecycle management
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Frontend:** React 19, Vite, Tailwind CSS 4, React Router
 - **Backend:** NestJS, TypeScript
@@ -22,7 +22,7 @@ RepoManager is a centralized GitHub Organization repository lifecycle management
 
 ---
 
-## 🚀 Initial Setup Guide
+## Initial Setup Guide
 
 Follow these steps to set up the project for local development.
 
@@ -35,7 +35,7 @@ You need a running instance of PostgreSQL (either installed locally or hosted vi
 To integrate with GitHub, you need an OAuth App and a Personal Access Token (PAT).
 
 **Create an OAuth App:**
-1. Go to your GitHub Profile -> **Settings** -> **Developer Settings** -> **OAuth Apps**.
+1. Go to your **GitHub Organization** Profile -> **Settings** -> **Developer Settings** -> **OAuth Apps**.
 2. Click **New OAuth App**.
 3. Set the **Homepage URL** to `http://localhost:5173`.
 4. Set the **Authorization callback URL** to `http://localhost:3000/auth/github/callback`.
