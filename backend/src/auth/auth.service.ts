@@ -33,7 +33,11 @@ export class AuthService {
     const username: string = profile.username;
 
     // Get target org from SystemConfig or fallback to ENV
+    console.log("DATABASE_URL =", process.env.DATABASE_URL);
+
     const config = await this.prisma.systemConfig.findFirst();
+
+    console.log("SystemConfig =", config);
     const targetOrg = config?.githubOrgName || this.configService.get<string>('GITHUB_ORG') || 'rizbern';
 
     // Verify org membership via GitHub API
